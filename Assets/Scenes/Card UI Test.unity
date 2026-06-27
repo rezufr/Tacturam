@@ -1303,7 +1303,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7535849732568691701, guid: 981ed5e593c220244adacf19ce74e288, type: 3}
       propertyPath: m_Name
-      value: Move (1)
+      value: Move
       objectReference: {fileID: 0}
     - target: {fileID: 8873051467161195774, guid: 981ed5e593c220244adacf19ce74e288, type: 3}
       propertyPath: m_Pivot.x

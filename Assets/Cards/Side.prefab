@@ -221,6 +221,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9626db4ddb549348a71e40a97aae18f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  actionType: 4
+  actionValue: 1
   hoverHeight: 20
   selectHeight: 40
   hoverScale: 1.05

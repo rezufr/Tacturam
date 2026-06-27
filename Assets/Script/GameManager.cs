@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
+using DG.Tweening;
 
 public class GameManager : MonoBehaviour
 {
@@ -18,6 +19,9 @@ public class GameManager : MonoBehaviour
     [Header("Game Settings")]
     public int startingDeckSize = 20;
 
+    [Header("Player Reference")]
+    public PlayerMovement player;
+
     [Header("Animation & Timings")]
     [SerializeField] private float playStaggerDelay = 0.25f; // Jeda antar kartu mulai menghilang
     [SerializeField] private float cardShowDuration = 0.5f;  // Berapa lama kartu "pamer" sebelum hilang
@@ -26,6 +30,12 @@ public class GameManager : MonoBehaviour
 
     private List<GameObject> deckList = new List<GameObject>();
     private bool isPlayingSequence = false;
+
+    // Untuk fitur Copy
+    private CardAction lastActionType;
+    private int lastActionValue;
+    private bool lastActionIsFlipped;
+    private bool hasLastAction = false;
 
     void Start()
     {
@@ -89,10 +99,19 @@ public class GameManager : MonoBehaviour
         // TUNGGU: Agar player bisa melihat kartu apa saja yang dia mainkan
         yield return new WaitForSeconds(cardShowDuration);
 
-        // LOOP 2: Hilang SATU PER SATU
+        // LOOP 2: Hilang SATU PER SATU + Eksekusi Aksi
         for (int i = 0; i < selectedCards.Count; i++)
         {
-            selectedCards[i].PlayVanishPhase();
+            CardController card = selectedCards[i];
+            
+            // Eksekusi Aksi Player
+            ExecuteCardAction(card);
+
+            // Tunggu player selesai bergerak/berputar
+            yield return new WaitUntil(() => player.IsMoving == false);
+
+            // Hilangkan kartu
+            card.PlayVanishPhase();
             yield return new WaitForSeconds(playStaggerDelay);
         }
 
@@ -114,6 +133,11 @@ public class GameManager : MonoBehaviour
             if (c.IsSelected) 
             { 
                 deckList.Add(FindPrefabInArray(c.gameObject.name));
+                
+                // SAFETY: Matikan semua animasi sebelum Destroy
+                c.transform.DOKill();
+                DOTween.Kill(c.gameObject);
+                
                 Destroy(c.gameObject); 
                 count++; 
             }
@@ -158,6 +182,67 @@ public class GameManager : MonoBehaviour
         deckList.RemoveAt(0);
         Instantiate(cardToDraw, handContainer);
         UpdateDeckText();
+    }
+
+    private void ExecuteCardAction(CardController card)
+    {
+        if (player == null) return;
+
+        CardAction action = card.actionType;
+        int value = card.actionValue;
+        bool flipped = card.IsFlipped;
+
+        // Jika ini kartu Copy
+        if (action == CardAction.Copy)
+        {
+            if (hasLastAction)
+            {
+                Debug.Log("[GameManager] Copying last action: " + lastActionType + " with value: " + lastActionValue);
+                ApplyAction(lastActionType, lastActionValue, lastActionIsFlipped);
+            }
+            else
+            {
+                Debug.LogWarning("[GameManager] No last action to copy!");
+            }
+            return;
+        }
+
+        // Simpan sebagai aksi terakhir
+        lastActionType = action;
+        lastActionValue = value;
+        lastActionIsFlipped = flipped;
+        hasLastAction = true;
+
+        ApplyAction(action, value, flipped);
+    }
+
+    private void ApplyAction(CardAction action, int value, bool flipped)
+    {
+        switch (action)
+        {
+            case CardAction.Move:
+                player.Move(player.facingDirection, value);
+                break;
+
+            case CardAction.Dash:
+                player.Move(player.facingDirection, value);
+                break;
+
+            case CardAction.Back:
+                player.Move(-player.facingDirection, value);
+                break;
+
+            case CardAction.Rotate:
+                // Original: Putar Kanan (1), Flipped: Putar Kiri (-1)
+                player.RotatePlayer(flipped ? -1 : 1);
+                break;
+
+            case CardAction.Side:
+                // Original: Geser Kanan Player, Flipped: Geser Kiri Player
+                Vector2Int sideDir = player.GetSideDirection(!flipped);
+                player.Move(sideDir, value);
+                break;
+        }
     }
 
     private void UpdateDeckText()

@@ -17,4 +17,7 @@ public enum TileType
     Move,
     Block,
     Telegraph,
+    Stop,
+    Slip,
 }
+

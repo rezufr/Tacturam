@@ -2,8 +2,22 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using DG.Tweening;
 
-public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
+public enum CardAction
 {
+    Move,    // Maju 1 Tile
+    Dash,    // Maju 2 Tiles
+    Back,    // Mundur 1 Tile
+    Rotate,  // Berputar (Bisa Flip: Kanan/Kiri)
+    Side,    // Geser Samping (Bisa Flip: Samping Kanan/Kiri)
+    Copy     // Meniru aksi terakhir
+}
+
+public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler, IBeginDragHandler, IDragHandler, IEndDragHandler
+{
+    [Header("Card Action Data")]
+    public CardAction actionType;      // Jenis aksi kartu ini
+    public int actionValue = 1;         // Nilai aksi (misal: jarak)
+
     [Header("DOTween Animation Settings")]
     [SerializeField] private float hoverHeight = 40f;       // Tinggi kartu saat di-hover
     [SerializeField] private float selectHeight = 90f;      // Tinggi kartu saat diklik (Selected)
@@ -27,14 +41,18 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     [SerializeField] private Vector2 btnFlippedPos;       // Posisi tombol saat di-flip (misal: Kanan Atas)
 
     private RectTransform rectTransform;
+    private Transform originalParent;
+    private int originalSiblingIndex;
 
     // Karena kartu di dalam wrapper, posisi dasar Y selalu 0 relatif terhadap wrapper-nya
     private float startY = 0f;
     private bool isHovered = false;
     private bool isAnimatingFlip = false;
+    private bool isDragging = false;
 
     public bool IsSelected { get; private set; } = false;
     public bool IsFlipped { get; private set; } = false;
+    public bool IsDragging => isDragging;
 
     void Start()
     {
@@ -69,7 +87,7 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     private void AnimateCard()
     {
-        if (isAnimatingFlip) return;
+        if (isAnimatingFlip || isDragging) return;
 
         // 1. Hitung Target Posisi Y (Pasti akurat karena startY selalu 0)
         float targetY = startY;
@@ -90,29 +108,113 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         // 3. Eksekusi DOTween
         visualTransform.DOKill();
 
-        visualTransform.DOAnchorPosY(targetY, duration).SetEase(easeType);
-        visualTransform.DOScale(new Vector3(targetScale, targetScale, 1f), duration).SetEase(easeType);
+        visualTransform.DOAnchorPosY(targetY, duration).SetEase(easeType).SetLink(gameObject);
+        visualTransform.DOScale(new Vector3(targetScale, targetScale, 1f), duration).SetEase(easeType).SetLink(gameObject);
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
+        if (isDragging) return;
         isHovered = true;
         AnimateCard();
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
+        if (isDragging) return;
         isHovered = false;
         AnimateCard();
     }
 
     public void OnPointerClick(PointerEventData eventData)
     {
+        // Cegah klik terpanggil jika baru saja selesai drag
+        if (eventData.dragging) return;
+
         if (eventData.button == PointerEventData.InputButton.Left)
         {
             IsSelected = !IsSelected;
             AnimateCard();
         }
+    }
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        if (IsDying) return;
+
+        isDragging = true;
+
+        // EMERGENCY RESET: Matikan semua animasi visual dan kembalikan ke titik nol
+        // sebelum dipindahkan parent-nya untuk mencegah bug "Meloncat"
+        visualTransform.DOKill();
+        visualTransform.anchoredPosition = new Vector2(visualTransform.anchoredPosition.x, startY);
+        visualTransform.localScale = Vector3.one;
+
+        originalParent = transform.parent;
+        originalSiblingIndex = transform.GetSiblingIndex();
+
+        // Buat Placeholder (objek bayangan) agar layout tetap ada celahnya
+        GameObject placeholderGO = new GameObject("CardPlaceholder");
+        placeholderGO.transform.SetParent(originalParent);
+        RectTransform rt = placeholderGO.AddComponent<RectTransform>();
+        rt.sizeDelta = rectTransform.sizeDelta;
+        placeholderGO.transform.SetSiblingIndex(originalSiblingIndex);
+
+        // Pindahkan kartu ke Canvas Root agar tampil paling depan
+        Canvas rootCanvas = GetComponentInParent<Canvas>();
+        if (rootCanvas != null) transform.SetParent(rootCanvas.transform, true);
+
+        // RESET ROTASI (Biar Lurus saat di-drag)
+        transform.DOKill();
+        transform.DORotate(Vector3.zero, 0.1f).SetEase(Ease.OutQuad).SetLink(gameObject);
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (!isDragging) return;
+
+        // Ikuti posisi mouse
+        transform.position = eventData.position;
+
+        // Reordering Logic: Cari posisi index baru untuk Placeholder
+        Transform placeholder = originalParent.Find("CardPlaceholder");
+        if (placeholder != null)
+        {
+            int newIndex = originalParent.childCount - 1;
+            for (int i = 0; i < originalParent.childCount; i++)
+            {
+                if (transform.position.x < originalParent.GetChild(i).position.x)
+                {
+                    newIndex = i;
+                    if (placeholder.GetSiblingIndex() < newIndex) newIndex--;
+                    break;
+                }
+            }
+            placeholder.SetSiblingIndex(newIndex);
+        }
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        if (!isDragging) return;
+        isDragging = false;
+
+        // Reset visual internal dulu biar tidak miring/offset
+        visualTransform.DOKill();
+        visualTransform.anchoredPosition = new Vector2(visualTransform.anchoredPosition.x, startY);
+
+        Transform placeholder = originalParent.Find("CardPlaceholder");
+        if (placeholder != null)
+        {
+            int newIndex = placeholder.GetSiblingIndex();
+            transform.SetParent(originalParent, true);
+            transform.SetSiblingIndex(newIndex);
+            Destroy(placeholder.gameObject);
+        }
+
+        // Reset state hover dan jalankan animasi normal (berdasarkan IsSelected)
+        isHovered = false;
+        AnimateCard();
     }
 
     public void ResetCard()
@@ -144,6 +246,7 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
             UpdateVisualsInstant(); // Tukar semua visual kartu + tombol di tengah animasi
         });
         flipSequence.Append(visualTransform.DOScaleX(currentTargetScale, duration).SetEase(Ease.OutQuad));
+        flipSequence.SetLink(gameObject);
         flipSequence.OnComplete(() => {
             isAnimatingFlip = false;
         });
@@ -165,6 +268,7 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         // Naik sedikit (80f) dan membesar (1.1x)
         seq.Append(visualTransform.DOAnchorPosY(80f, 0.25f).SetEase(Ease.OutBack));
         seq.Join(visualTransform.DOScale(1.1f, 0.25f).SetEase(Ease.OutBack));
+        seq.SetLink(gameObject);
     }
 
     /// <summary>
@@ -180,6 +284,7 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
         // Mengecil ke nol
         seq.Append(visualTransform.DOScale(0, 0.3f).SetEase(Ease.InBack));
+        seq.SetLink(gameObject);
         seq.OnComplete(() => Destroy(gameObject));
     }
 
@@ -214,10 +319,16 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
         // 5. Mengecil dan menghilang
         playSeq.Append(transform.DOScale(0, 0.3f).SetEase(Ease.InBack));
-        
-        // 6. Hancurkan objek setelah selesai
     }
 
     // Getter untuk kebutuhan Deck View
     public Sprite GetOriginalSprite() => cardOriginalSprite;
+
+    private void OnDestroy()
+    {
+        // Pastikan semua animasi mati saat objek dihancurkan untuk mencegah Safe Mode Error
+        transform.DOKill();
+        if (visualTransform != null) visualTransform.DOKill();
+        DOTween.Kill(this);
+    }
 }

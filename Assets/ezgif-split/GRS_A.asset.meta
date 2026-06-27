@@ -1,13 +1,8 @@
 fileFormatVersion: 2
-<<<<<<<< HEAD:Assets/ezgif-split/GRS_A.asset.meta
 guid: 5a55d7e4b19c75a4ebfe3cf59a987cef
 NativeFormatImporter:
-========
-guid: 33492879483e146ac9dbf83590238f17
-folderAsset: yes
-DefaultImporter:
->>>>>>>> fdcae144ad64703560e1657d977e8c80f561b4e6:Assets/Script/Class.meta
   externalObjects: {}
+  mainObjectFileID: 0
   userData: 
   assetBundleName: 
   assetBundleVariant: 

@@ -12,19 +12,28 @@ public class HandLayoutManager : MonoBehaviour
     [SerializeField] private float verticalOffset = -50f; // Offset posisi Y dasar
 
     private int lastChildCount = -1;
+    private int lastSiblingHash = -1;
     private float lastSpacing, lastMaxRot, lastArc, lastOffset;
 
     void Update()
     {
         int currentCount = 0;
+        int currentSiblingHash = 0;
+        int index = 0;
         foreach (Transform child in transform)
         {
-            if (child.gameObject.activeSelf) currentCount++;
+            if (child.gameObject.activeSelf)
+            {
+                currentCount++;
+                // Hash yang sensitif terhadap urutan (index)
+                currentSiblingHash += (index + 1) * child.GetHashCode();
+                index++;
+            }
         }
 
-        // Sekarang kita hanya update layout jika jumlah ANAK benar-benar berubah (setelah Destroy)
-        // Ini memastikan gap tetap terbuka selama kartu sedang mengecil
+        // Update layout jika jumlah anak BERUBAH atau URUTAN (Sibling Index) BERUBAH
         if (currentCount != lastChildCount || 
+            currentSiblingHash != lastSiblingHash ||
             spacing != lastSpacing || 
             maxRotation != lastMaxRot || 
             arcHeight != lastArc || 
@@ -32,6 +41,7 @@ public class HandLayoutManager : MonoBehaviour
         {
             UpdateLayout();
             lastChildCount = currentCount;
+            lastSiblingHash = currentSiblingHash;
             lastSpacing = spacing; 
             lastMaxRot = maxRotation; 
             lastArc = arcHeight; 
@@ -58,9 +68,9 @@ public class HandLayoutManager : MonoBehaviour
             RectTransform card = cards[i];
             if (card == null) continue;
 
-            // CEK: Jika kartu sedang dimainkan (Dying), jangan dipindahkan posisinya oleh Layout
+            // CEK: Jika kartu sedang dimainkan (Dying) atau sedang di-drag, jangan dipindahkan posisinya oleh Layout
             CardController controller = card.GetComponent<CardController>();
-            if (controller != null && controller.IsDying) continue;
+            if (controller != null && (controller.IsDying || controller.IsDragging)) continue;
 
             card.pivot = new Vector2(0.5f, 0f);
             card.anchorMin = new Vector2(0.5f, 0.5f);
@@ -74,8 +84,8 @@ public class HandLayoutManager : MonoBehaviour
             if (Application.isPlaying)
             {
                 DOTween.Kill(card); 
-                card.DOAnchorPos(new Vector2(posX, posY), 0.4f).SetEase(Ease.OutBack);
-                card.DORotate(new Vector3(0, 0, rotZ), 0.4f).SetEase(Ease.OutBack);
+                card.DOAnchorPos(new Vector2(posX, posY), 0.4f).SetEase(Ease.OutBack).SetLink(card.gameObject);
+                card.DORotate(new Vector3(0, 0, rotZ), 0.4f).SetEase(Ease.OutBack).SetLink(card.gameObject);
             }
             else
             {

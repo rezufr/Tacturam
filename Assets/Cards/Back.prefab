@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 795991930276776650}
   - component: {fileID: 6013370152657418578}
   m_Layer: 5
-  m_Name: Dash
+  m_Name: Back
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -89,6 +89,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d9626db4ddb549348a71e40a97aae18f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  actionType: 2
+  actionValue: 1
   hoverHeight: 20
   selectHeight: 40
   hoverScale: 1.05
@@ -170,7 +172,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: -1590536982, guid: aa8d6b5222e8c8e46b53d2128202623a, type: 3}
+  m_Sprite: {fileID: -1592946864, guid: 492c6eaad0b590048a18e73df2fd1d61, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
