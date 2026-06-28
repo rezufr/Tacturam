@@ -11,11 +11,14 @@ public class PlayerMovement : MonoBehaviour
     [Header("Settings")]
     public float moveSpeed = 7f;    // Kecepatan gerak (Velocity)
     public float stepDelay = 0.05f; // Jeda antar langkah
+    public int damage = 1; // Jumlah damage player
 
     [Header("Orientation")]
     public Vector2Int facingDirection = Vector2Int.down; // Arah hadap awal (Down)
     private bool isMoving = false;
+    private bool isAttacking = false;
     public bool IsMoving => isMoving; // Getter untuk GameManager
+    public bool IsAttacking => isAttacking; // Getter untuk GameManager
 
     [Header("Animation")]
     public Animator playerAnimator;
@@ -55,7 +58,7 @@ public class PlayerMovement : MonoBehaviour
         isMoving = false;
     }
 
-    private void UpdateVisualRotation()
+    public void UpdateVisualRotation()
     {
         if (facingDirection == Vector2Int.up) AnimationPlayer(1);
         else if (facingDirection == Vector2Int.right) AnimationPlayer(1);
@@ -107,9 +110,43 @@ public class PlayerMovement : MonoBehaviour
 
             if (tilemapController.CanMoveTo(targetGridPos))
             {
+                if (tilemapController.CheckEnemyIsThere(targetGridPos) && !isAttacking)
+                {
+                    Debug.Log("Enemy detected! Stopping movement for attack.");
+                    AnimationPlayer(3); // Set animasi attack
+                    isAttacking = true;
+                    if (tilemapController.AttackEnemyAt(targetGridPos, damage)) // Panggil fungsi attack di TilemapController
+                    {
+                        yield return new WaitForSeconds(0.9f); // Jeda durasi animasi attack
+                    }
+                    else
+                    {
+                        yield return new WaitForSeconds(0.9f); // Jeda durasi animasi attack
+                        break; // Enemy tidak berhasil diserang, hentikan pergerakan player
+                    }
+                }
                 // Gerak Mulus ke Target
                 Vector3 targetWorldPos = tilemapController.gridTilemap.GetCellCenterWorld(targetGridPos);
                 yield return StartCoroutine(MoveToPosition(targetWorldPos));
+
+                // cek tile neighbor apakah ada enemy, jika ada maka hentikan pergerakan player untuk attack lalu lanjutkan move ke target tile
+                if (tilemapController.CheckMoveToEnemy(targetGridPos) && !isAttacking)
+                {
+                    Debug.Log("Enemy detected nearby! Stopping movement for attack.");
+
+                    isAttacking = true;
+                    if (tilemapController.AttackEnemyAtNeighbor(targetGridPos, damage)) // Panggil fungsi attack di TilemapController
+                    {
+                        AnimationPlayer(3);
+                        yield return new WaitForSeconds(0.9f); // Jeda durasi animasi attack
+                    }
+                    else
+                    {
+                        AnimationPlayer(3);
+                        yield return new WaitForSeconds(0.9f);
+                        break; // Enemy tidak berhasil diserang, hentikan pergerakan player
+                    }
+                }
 
                 // Cek efek tile setelah sampai
                 if (tilemapController.IsTileType(targetGridPos, TileType.Stop))
@@ -130,6 +167,7 @@ public class PlayerMovement : MonoBehaviour
                     }
                 }
 
+
                 yield return new WaitForSeconds(stepDelay);
             }
             else
@@ -139,6 +177,7 @@ public class PlayerMovement : MonoBehaviour
             }
         }
 
+        isAttacking = false; // Reset status attack setelah selesai bergerak
         isMoving = false;
         AnimationPlayer(1); // Set animasi idle setelah selesai bergerak
     }
@@ -152,7 +191,6 @@ public class PlayerMovement : MonoBehaviour
         // Geser posisi secara bertahap (Velocity-based)
         while (Vector2.Distance(transform.position, targetPos) > 0.001f)
         {
-
             transform.position = Vector3.MoveTowards(transform.position, targetPos, moveSpeed * Time.deltaTime);
             yield return null;
         }
@@ -198,7 +236,7 @@ public class PlayerMovement : MonoBehaviour
 
         // Reset semua trigger
         playerAnimator.ResetTrigger("Move");
-        print("Resetting Move trigger");
+        print("Resetting Move trigger and Attack trigger");
         // playerAnimator.ResetTrigger("Attack");
 
         // Set trigger sesuai actionValue
@@ -208,11 +246,10 @@ public class PlayerMovement : MonoBehaviour
                 playerAnimator.SetBool("Idle", true);
                 break;
             case 2:
-                playerAnimator.SetBool("Idle", false);
                 playerAnimator.SetTrigger("Move");
                 break;
             case 3:
-                playerAnimator.SetBool("Idle", false);
+                print("Setting Attack trigger");
                 playerAnimator.SetTrigger("Attack");
                 break;
             default:
