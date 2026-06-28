@@ -11,7 +11,7 @@ public class PlayerMovement : MonoBehaviour
     [Header("Settings")]
     public float moveSpeed = 7f;    // Kecepatan gerak (Velocity)
     public float stepDelay = 0.05f; // Jeda antar langkah
-    
+
     [Header("Orientation")]
     public Vector2Int facingDirection = Vector2Int.down; // Arah hadap awal (Down)
     private bool isMoving = false;
@@ -57,13 +57,11 @@ public class PlayerMovement : MonoBehaviour
 
     private void UpdateVisualRotation()
     {
-        float targetAngle = 0;
-        if (facingDirection == Vector2Int.up) targetAngle = 0;
-        else if (facingDirection == Vector2Int.right) targetAngle = -90f;
-        else if (facingDirection == Vector2Int.down) targetAngle = -180f;
-        else if (facingDirection == Vector2Int.left) targetAngle = -270f;
 
-        transform.DORotate(new Vector3(0, 0, targetAngle), 0.3f).SetEase(Ease.OutBack).SetLink(gameObject);
+        if (facingDirection == Vector2Int.up) AnimationPlayer(1);
+        else if (facingDirection == Vector2Int.right) AnimationPlayer(1);
+        else if (facingDirection == Vector2Int.down) AnimationPlayer(1);
+        else if (facingDirection == Vector2Int.left) AnimationPlayer(1);
     }
 
     /// <summary>
@@ -117,8 +115,9 @@ public class PlayerMovement : MonoBehaviour
                 // Cek efek tile setelah sampai
                 if (tilemapController.IsTileType(targetGridPos, TileType.Stop))
                 {
+                    AnimationPlayer(1); // Set animasi idle
                     Debug.Log("FORCE STOP!");
-                    break; 
+                    break;
                 }
 
                 if (tilemapController.IsTileType(targetGridPos, TileType.Slip))
@@ -136,11 +135,13 @@ public class PlayerMovement : MonoBehaviour
             }
             else
             {
+                AnimationPlayer(1); // Set animasi idle
                 break; // Terpentok tembok/batas
             }
         }
 
         isMoving = false;
+        AnimationPlayer(1); // Set animasi idle setelah selesai bergerak
     }
 
     private IEnumerator MoveToPosition(Vector3 targetPos)
@@ -148,18 +149,77 @@ public class PlayerMovement : MonoBehaviour
         // Pastikan Z tetap sama (penting buat Game 2D agar distance check akurat)
         targetPos.z = transform.position.z;
 
+        AnimationPlayer(2); // Set animasi berjalan
         // Geser posisi secara bertahap (Velocity-based)
         while (Vector2.Distance(transform.position, targetPos) > 0.001f)
         {
+
             transform.position = Vector3.MoveTowards(transform.position, targetPos, moveSpeed * Time.deltaTime);
             yield return null;
         }
         transform.position = targetPos;
     }
 
-    public void AnimationPlayer(int animationType)
+    public void AnimationPlayer(int actionValue)
     {
-        
+        if (playerAnimator == null)
+        {
+            Debug.LogWarning("PlayerMovement: Animator belum di-assign!");
+            return;
+        }
+
+        if (facingDirection == Vector2Int.up)
+        {
+            playerAnimator.SetBool("UpSide", true);
+            playerAnimator.SetBool("DownSide", false);
+            playerAnimator.SetBool("LeftSide", false);
+            playerAnimator.SetBool("RightSide", false);
+        }
+        else if (facingDirection == Vector2Int.down)
+        {
+            playerAnimator.SetBool("DownSide", true);
+            playerAnimator.SetBool("UpSide", false);
+            playerAnimator.SetBool("LeftSide", false);
+            playerAnimator.SetBool("RightSide", false);
+        }
+        else if (facingDirection == Vector2Int.left)
+        {
+            playerAnimator.SetBool("LeftSide", true);
+            playerAnimator.SetBool("UpSide", false);
+            playerAnimator.SetBool("DownSide", false);
+            playerAnimator.SetBool("RightSide", false);
+        }
+        else if (facingDirection == Vector2Int.right)
+        {
+            playerAnimator.SetBool("RightSide", true);
+            playerAnimator.SetBool("UpSide", false);
+            playerAnimator.SetBool("DownSide", false);
+            playerAnimator.SetBool("LeftSide", false);
+        }
+
+        // Reset semua trigger
+        playerAnimator.ResetTrigger("Move");
+        print("Resetting Move trigger");
+        // playerAnimator.ResetTrigger("Attack");
+
+        // Set trigger sesuai actionValue
+        switch (actionValue)
+        {
+            case 1:
+                playerAnimator.SetBool("Idle", true);
+                break;
+            case 2:
+                playerAnimator.SetBool("Idle", false);
+                playerAnimator.SetTrigger("Move");
+                break;
+            case 3:
+                playerAnimator.SetBool("Idle", false);
+                playerAnimator.SetTrigger("Attack");
+                break;
+            default:
+                Debug.LogWarning($"PlayerMovement: ActionValue {actionValue} tidak dikenali.");
+                break;
+        }
     }
 
     // --- TEST FUNCTIONS ---
