@@ -57,7 +57,6 @@ public class PlayerMovement : MonoBehaviour
 
     private void UpdateVisualRotation()
     {
-
         if (facingDirection == Vector2Int.up) AnimationPlayer(1);
         else if (facingDirection == Vector2Int.right) AnimationPlayer(1);
         else if (facingDirection == Vector2Int.down) AnimationPlayer(1);
