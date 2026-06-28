@@ -21,6 +21,7 @@ public class GameManager : MonoBehaviour
 
     [Header("Player Reference")]
     public PlayerMovement player;
+    public EnemyMovement[] enemy;
 
     [Header("Animation & Timings")]
     [SerializeField] private float playStaggerDelay = 0.25f; // Jeda antar kartu mulai menghilang
