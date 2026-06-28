@@ -13,10 +13,12 @@ public class PlayerMovement : MonoBehaviour
     public float stepDelay = 0.05f; // Jeda antar langkah
     
     [Header("Orientation")]
-    public Vector2Int facingDirection = Vector2Int.up; // Arah hadap awal (Up)
-    
+    public Vector2Int facingDirection = Vector2Int.down; // Arah hadap awal (Down)
     private bool isMoving = false;
     public bool IsMoving => isMoving; // Getter untuk GameManager
+
+    [Header("Animation")]
+    public Animator playerAnimator;
 
     /// <summary>
     /// Berputar 90 derajat. 
@@ -153,6 +155,11 @@ public class PlayerMovement : MonoBehaviour
             yield return null;
         }
         transform.position = targetPos;
+    }
+
+    public void AnimationPlayer(int animationType)
+    {
+        
     }
 
     // --- TEST FUNCTIONS ---

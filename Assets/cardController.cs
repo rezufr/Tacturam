@@ -140,6 +140,7 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     public void OnBeginDrag(PointerEventData eventData)
     {
+        print(eventData);
         if (IsDying) return;
 
         isDragging = true;
