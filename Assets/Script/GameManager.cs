@@ -16,6 +16,9 @@ public class GameManager : MonoBehaviour
     [Tooltip("UI Text sisa deck")]
     public TextMeshProUGUI deckCountText;
 
+    [Tooltip("Transform objek visual Deck (untuk animasi spawn kartu)")]
+    public RectTransform deckTransform;
+
     [Header("Game Settings")]
     public int startingDeckSize = 20;
 
@@ -181,8 +184,22 @@ public class GameManager : MonoBehaviour
         if (deckList.Count == 0) return;
         GameObject cardToDraw = deckList[0];
         deckList.RemoveAt(0);
-        Instantiate(cardToDraw, handContainer);
+
+        // Spawn di dalam handContainer (untuk ikut layout), tapi posisi awalnya di atas deck
+        GameObject newCard = Instantiate(cardToDraw, handContainer);
         UpdateDeckText();
+
+        // Jalankan animasi dari posisi deck ke posisi di tangan
+        CardController cardCtrl = newCard.GetComponent<CardController>();
+        if (cardCtrl != null && deckTransform != null)
+        {
+            // Konversi posisi dunia deck ke posisi lokal di dalam handContainer
+            Vector2 deckLocalPos = handContainer is RectTransform handRT
+                ? (Vector2)handRT.InverseTransformPoint(deckTransform.position)
+                : Vector2.zero;
+
+            cardCtrl.PlayDrawAnimation(deckLocalPos);
+        }
     }
 
     private void ExecuteCardAction(CardController card)
