@@ -1668,6 +1668,7 @@ MonoBehaviour:
   - {fileID: 7535849732568691701, guid: e9e6f1b97c1f8c74fa21a3c2a9146337, type: 3}
   - {fileID: 7535849732568691701, guid: 5eaf75eb06b5bfd4a8fb009d7f25c46c, type: 3}
   deckCountText: {fileID: 1741806656}
+  deckTransform: {fileID: 212257345}
   startingDeckSize: 8
   player: {fileID: 643830916}
   enemy: []

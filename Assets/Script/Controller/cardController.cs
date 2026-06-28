@@ -321,6 +321,32 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         playSeq.Append(transform.DOScale(0, 0.3f).SetEase(Ease.InBack));
     }
 
+    /// <summary>
+    /// Animasi saat kartu baru masuk dari deck ke tangan
+    /// </summary>
+    public void PlayDrawAnimation(Vector2 deckLocalPos)
+    {
+        // Pastikan rectTransform sudah di-init (mungkin belum jika dipanggil sebelum Start)
+        if (rectTransform == null) rectTransform = GetComponent<RectTransform>();
+
+        // Langsung set posisi ke posisi deck (di dalam handContainer)
+        rectTransform.anchoredPosition = deckLocalPos;
+
+        // Mulai dari kecil dan transparan
+        transform.localScale = Vector3.one * 0.3f;
+        CanvasGroup cg = GetComponent<CanvasGroup>();
+        if (cg == null) cg = gameObject.AddComponent<CanvasGroup>();
+        cg.alpha = 0f;
+
+        // Terbang ke posisi normal dengan efek OutBack (nempel di sana)
+        Sequence seq = DOTween.Sequence();
+        seq.Append(cg.DOFade(1f, 0.2f).SetEase(Ease.OutQuad));
+        seq.Join(transform.DOScale(1f, 0.4f).SetEase(Ease.OutBack));
+        // posisi akan di-handle HandLayoutManager; kita hanya reset rotation
+        seq.Join(transform.DORotate(Vector3.zero, 0.4f).SetEase(Ease.OutBack));
+        seq.SetLink(gameObject);
+    }
+
     // Getter untuk kebutuhan Deck View
     public Sprite GetOriginalSprite() => cardOriginalSprite;
 
