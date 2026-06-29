@@ -17,6 +17,10 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     [Header("Card Action Data")]
     public CardAction actionType;      // Jenis aksi kartu ini
     public int actionValue = 1;         // Nilai aksi (misal: jarak)
+    
+    [TextArea(2, 4)]
+    public string cardDescription = "Move two steps and ignore the negative tile.";
+
 
     [Header("DOTween Animation Settings")]
     [SerializeField] private float hoverHeight = 40f;       // Tinggi kartu saat di-hover
@@ -53,6 +57,9 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     public bool IsSelected { get; private set; } = false;
     public bool IsFlipped { get; private set; } = false;
     public bool IsDragging => isDragging;
+
+    public RectTransform VisualTransform => visualTransform;
+    public UnityEngine.UI.Image CardImageUI => cardImage;
 
     void Start()
     {

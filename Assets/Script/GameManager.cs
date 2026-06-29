@@ -35,6 +35,9 @@ public class GameManager : MonoBehaviour
     private List<GameObject> deckList = new List<GameObject>();
     private bool isPlayingSequence = false;
 
+    // Permanent deck registry persisting across scene reloads
+    public static List<string> permanentDeckNames = new List<string>();
+
     // Untuk fitur Copy
     private CardAction lastActionType;
     private int lastActionValue;
@@ -47,15 +50,55 @@ public class GameManager : MonoBehaviour
         UpdateDeckText();
     }
 
+    void Update()
+    {
+        // Testing trigger for UI/reward integration
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            Debug.Log("[GameManager] Cheat key 'R' pressed. Loading RewardUI scene...");
+            UnityEngine.SceneManagement.SceneManager.LoadScene("RewardUI");
+        }
+    }
+
+    public static void AddCardToPermanentDeck(string cardName)
+    {
+        if (permanentDeckNames == null)
+        {
+            permanentDeckNames = new List<string>();
+        }
+        permanentDeckNames.Add(cardName);
+        Debug.Log($"[GameManager] Added {cardName} permanently to deck registry. Total: {permanentDeckNames.Count} cards.");
+    }
+
     private void InitializeDeck()
     {
         deckList.Clear();
-        for (int i = 0; i < startingDeckSize; i++)
+        
+        if (permanentDeckNames != null && permanentDeckNames.Count > 0)
         {
-            if (cardPrefabs.Length > 0)
+            Debug.Log($"[GameManager] Loading deck from permanent deck registry ({permanentDeckNames.Count} cards).");
+            foreach (var cardName in permanentDeckNames)
             {
-                int randomIndex = Random.Range(0, cardPrefabs.Length);
-                deckList.Add(cardPrefabs[randomIndex]);
+                GameObject prefab = FindPrefabInArray(cardName);
+                if (prefab != null)
+                {
+                    deckList.Add(prefab);
+                }
+            }
+        }
+        else
+        {
+            Debug.Log("[GameManager] Permanent deck registry is empty. Initializing a new random deck.");
+            permanentDeckNames = new List<string>();
+            for (int i = 0; i < startingDeckSize; i++)
+            {
+                if (cardPrefabs.Length > 0)
+                {
+                    int randomIndex = Random.Range(0, cardPrefabs.Length);
+                    GameObject selectedPrefab = cardPrefabs[randomIndex];
+                    deckList.Add(selectedPrefab);
+                    permanentDeckNames.Add(selectedPrefab.name);
+                }
             }
         }
         ShuffleDeck();
