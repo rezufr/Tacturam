@@ -10,6 +10,7 @@ public class EnemyMovement : MonoBehaviour
     [Header("Settings")]
     public float moveSpeed = 7f;    // Kecepatan gerak (Velocity)
     public float stepDelay = 0.05f; // Jeda antar langkah
+    public int health = 1; // Jumlah nyawa musuh
 
     [Header("Orientation")]
     public Vector2Int facingDirection = Vector2Int.down; // Arah hadap awal (Down)
@@ -78,6 +79,27 @@ public class EnemyMovement : MonoBehaviour
             // Facing Up (0,1) -> Left (-1,0)
             return new Vector2Int(-facingDirection.y, facingDirection.x);
         }
+    }
+
+    public bool TakeDamage(int damageAmount)
+    {
+        health -= damageAmount;
+        Debug.Log($"Enemy took {damageAmount} damage. Remaining health: {health}");
+
+        if (health <= 0)
+        {
+            Die();
+            return true; // Enemy mati
+        }
+
+        return false; // Enemy masih hidup
+    }
+
+    public void Die()
+    {
+        Debug.Log("Enemy died!");
+        // Tambahkan efek kematian atau animasi di sini jika diperlukan
+        Destroy(gameObject);
     }
 
     /// <summary>
