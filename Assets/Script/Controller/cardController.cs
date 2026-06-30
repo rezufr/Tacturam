@@ -30,12 +30,6 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     [SerializeField] private Ease easeType = Ease.OutQuad;  // Jenis transisi halus DOTween
     [SerializeField] private RectTransform visualTransform; // Object visual yang akan digerakkan (Child)
 
-    [Header("Audio SFX (leave empty to use AudioManager defaults)")]
-    [SerializeField] private AudioClip sfxHover;
-    [SerializeField] private AudioClip sfxClick;
-    [SerializeField] private AudioClip sfxDraw;
-    [SerializeField] private AudioClip sfxVanish;
-
     [Header("Flip Settings (Card Sprite Swap)")]
     [SerializeField] private bool canFlip = false;          // Apakah kartu ini bisa di-flip
     [SerializeField] private UnityEngine.UI.Image cardImage;    // Komponen Image kartu
@@ -130,13 +124,6 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         if (isDragging) return;
         isHovered = true;
         AnimateCard();
-
-        // SFX
-        if (AudioManager.Instance != null)
-        {
-            AudioClip clip = sfxHover != null ? sfxHover : AudioManager.Instance.sfxCardHover;
-            AudioManager.Instance.PlaySFX(clip);
-        }
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -155,13 +142,6 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         {
             IsSelected = !IsSelected;
             AnimateCard();
-
-            // SFX
-            if (AudioManager.Instance != null)
-            {
-                AudioClip clip = sfxClick != null ? sfxClick : AudioManager.Instance.sfxCardClick;
-                AudioManager.Instance.PlaySFX(clip);
-            }
         }
     }
 
@@ -306,13 +286,6 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         if (IsDying) return;
         IsDying = true; // Langsung memicu pergeseran layout
 
-        // SFX kartu menghilang
-        if (AudioManager.Instance != null)
-        {
-            AudioClip clip = sfxVanish != null ? sfxVanish : AudioManager.Instance.sfxCardVanish;
-            AudioManager.Instance.PlaySFX(clip);
-        }
-
         visualTransform.DOKill();
         Sequence seq = DOTween.Sequence();
 
@@ -362,13 +335,6 @@ public class CardController : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     {
         // Pastikan rectTransform sudah di-init (mungkin belum jika dipanggil sebelum Start)
         if (rectTransform == null) rectTransform = GetComponent<RectTransform>();
-
-        // SFX kartu keluar dari deck
-        if (AudioManager.Instance != null)
-        {
-            AudioClip clip = sfxDraw != null ? sfxDraw : AudioManager.Instance.sfxCardDraw;
-            AudioManager.Instance.PlaySFX(clip);
-        }
 
         // Langsung set posisi ke posisi deck (di dalam handContainer)
         rectTransform.anchoredPosition = deckLocalPos;

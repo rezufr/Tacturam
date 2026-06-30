@@ -175,10 +175,6 @@ public class CardRewardManager : MonoBehaviour
     {
         if (selectedIndex == index) return;
 
-        // SFX on hover-in
-        if (enter && AudioManager.Instance != null)
-            AudioManager.Instance.PlaySFX(AudioManager.Instance.sfxCardHover);
-
         GameObject card = instantiatedCards[index];
         if (card == null) return;
 
@@ -190,10 +186,6 @@ public class CardRewardManager : MonoBehaviour
     private void OnCardClicked(int index)
     {
         if (selectedIndex == index) return;
-
-        // SFX on card select
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlaySFX(AudioManager.Instance.sfxCardClick);
 
         // Reset visual kartu yang sebelumnya dipilih
         if (selectedIndex != -1)
