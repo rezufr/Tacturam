@@ -100,7 +100,7 @@ public class CardRewardManager : MonoBehaviour
                 cardRT.anchorMax = new Vector2(0.5f, 0.5f);
                 cardRT.pivot = new Vector2(0.5f, 0.5f);
                 cardRT.anchoredPosition = Vector2.zero;
-                cardRT.sizeDelta = new Vector2(250f, 400f); // Ukuran container kartu
+                cardRT.sizeDelta = new Vector2(200f, 300f); // Ukuran container kartu
                 cardRT.localScale = Vector3.one;
             }
 
@@ -113,13 +113,13 @@ public class CardRewardManager : MonoBehaviour
                 // Samakan ukuran visual container utama objek kartu
                 if (cardCtrl.VisualTransform != null)
                 {
-                    cardCtrl.VisualTransform.sizeDelta = new Vector2(250f, 400f);
+                    cardCtrl.VisualTransform.sizeDelta = new Vector2(200f, 300f);
                 }
 
                 // Samakan ukuran image utama kartu
                 if (cardCtrl.CardImageUI != null)
                 {
-                    cardCtrl.CardImageUI.rectTransform.sizeDelta = new Vector2(250f, 400f);
+                    cardCtrl.CardImageUI.rectTransform.sizeDelta = new Vector2(200f, 300f);
                 }
             }
 
@@ -175,6 +175,10 @@ public class CardRewardManager : MonoBehaviour
     {
         if (selectedIndex == index) return;
 
+        // SFX on hover-in
+        if (enter && AudioManager.Instance != null)
+            AudioManager.Instance.PlaySFX(AudioManager.Instance.sfxCardHover);
+
         GameObject card = instantiatedCards[index];
         if (card == null) return;
 
@@ -186,6 +190,10 @@ public class CardRewardManager : MonoBehaviour
     private void OnCardClicked(int index)
     {
         if (selectedIndex == index) return;
+
+        // SFX on card select
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySFX(AudioManager.Instance.sfxCardClick);
 
         // Reset visual kartu yang sebelumnya dipilih
         if (selectedIndex != -1)

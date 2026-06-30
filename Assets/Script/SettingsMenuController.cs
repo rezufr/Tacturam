@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+
 public class SettingsMenuController : SwingingMenuPanel
 {
     [Header("Volume Sliders (assign in Inspector)")]
@@ -25,11 +26,31 @@ public class SettingsMenuController : SwingingMenuPanel
         if (SFXSlider    != null) SFXSlider.onValueChanged.AddListener(OnSFXChanged);
     }
 
-    /// <summary>Called every time the settings panel opens — sync sliders to saved values.</summary>
+    /// <summary>Called every time the settings panel opens — sync sliders and switch BGM.</summary>
     public override void OpenPanel()
     {
         base.OpenPanel();
         SyncSlidersToAudioManager();
+
+        // Switch to settings BGM
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySettingsBGM();
+    }
+
+    /// <summary>Called every time the settings panel closes — revert to scene BGM.</summary>
+    public override void ClosePanel()
+    {
+        base.ClosePanel();
+
+        // Revert BGM based on current scene
+        if (AudioManager.Instance != null)
+        {
+            string scene = SceneManager.GetActiveScene().name;
+            if (scene == "MainMenu")
+                AudioManager.Instance.PlayMainMenuBGM();
+            else
+                AudioManager.Instance.PlayIngameBGM();
+        }
     }
 
     // ── Slider Callbacks ──────────────────────────────────────────────────

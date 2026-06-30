@@ -48,6 +48,10 @@ public class GameManager : MonoBehaviour
     {
         InitializeDeck();
         UpdateDeckText();
+
+        // Start in-game BGM
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayIngameBGM();
     }
 
     void Update()
@@ -119,6 +123,8 @@ public class GameManager : MonoBehaviour
 
     public void OnPlayButtonClicked()
     {
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySFX(AudioManager.Instance.sfxButtonClick);
         StartCoroutine(PlayCardsSequence());
     }
 
@@ -172,7 +178,10 @@ public class GameManager : MonoBehaviour
     public void OnRecycleButtonClicked()
     {
         if (isPlayingSequence) return;
-        
+
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySFX(AudioManager.Instance.sfxButtonClick);
+
         CardController[] cardsInHand = handContainer.GetComponentsInChildren<CardController>();
         int count = 0;
         foreach (var c in cardsInHand)

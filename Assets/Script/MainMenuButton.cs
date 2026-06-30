@@ -12,12 +12,22 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     [SerializeField] private Shader colorOverrideShader;
 
     [Header("Color Settings")]
-    [SerializeField] private Color hoverColor = new Color(0.7f, 0.15f, 0.1f);     // Red hover color
+    [SerializeField] private Color hoverColor = new Color(0.7f, 0.15f, 0.1f);
 
     [Header("Animation Settings")]
-    [SerializeField] private float hoverScale = 1.15f;      // Scale multiplier when hovered
-    [SerializeField] private float duration = 0.15f;        // Transition duration in seconds
-    [SerializeField] private Ease easeType = Ease.OutQuad;  // DOTween easing function
+    [SerializeField] private float hoverScale = 1.15f;
+    [SerializeField] private float duration = 0.15f;
+    [SerializeField] private Ease easeType = Ease.OutQuad;
+
+    [Header("Audio")]
+    [Tooltip("Override hover SFX (empty = use AudioManager.sfxButtonHover)")]
+    [SerializeField] private AudioClip sfxHover;
+    [Tooltip("Override click SFX (empty = use AudioManager.sfxButtonClick)")]
+    [SerializeField] private AudioClip sfxClick;
+    [Tooltip("If true, pressing this button will fade out the BGM before switching scene.")]
+    [SerializeField] private bool isStartButton = false;
+    [Tooltip("BGM fade duration in seconds (only used when isStartButton = true).")]
+    [SerializeField] private float bgmFadeDuration = 1f;
 
     private Vector3 originalScale;
     private Material instancedMaterial;
@@ -25,39 +35,26 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     void Start()
     {
-        // Try getting Image component if not assigned
         if (buttonImage == null)
-        {
             buttonImage = GetComponent<Image>();
-        }
 
-        // Store the default local scale of this button
         originalScale = transform.localScale;
 
-        // Find the custom shader if not explicitly assigned in Inspector
         if (colorOverrideShader == null)
-        {
             colorOverrideShader = Shader.Find("UI/ColorOverride");
-        }
 
-        // Create an instanced material so it doesn't affect other UI elements sharing the same material
         if (buttonImage != null && colorOverrideShader != null)
         {
             instancedMaterial = new Material(colorOverrideShader);
             instancedMaterial.SetColor("_HoverColor", hoverColor);
             instancedMaterial.SetFloat("_HoverProgress", 0f);
-            
             buttonImage.material = instancedMaterial;
         }
-        else
+        else if (colorOverrideShader == null)
         {
-            if (colorOverrideShader == null)
-            {
-                Debug.LogWarning("UIColorOverride shader 'UI/ColorOverride' not found! Make sure UIColorOverride.shader is compiled.");
-            }
+            Debug.LogWarning("UIColorOverride shader 'UI/ColorOverride' not found!");
         }
 
-        // Apply normal visual state immediately at start
         ResetVisualsInstant();
     }
 
@@ -65,6 +62,13 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     {
         isHovered = true;
         AnimateHover(true);
+
+        // Play hover SFX
+        if (AudioManager.Instance != null)
+        {
+            AudioClip clip = sfxHover != null ? sfxHover : AudioManager.Instance.sfxButtonHover;
+            AudioManager.Instance.PlaySFX(clip);
+        }
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -75,32 +79,32 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        // Click action placeholder
+        // Play click SFX
+        if (AudioManager.Instance != null)
+        {
+            AudioClip clip = sfxClick != null ? sfxClick : AudioManager.Instance.sfxButtonClick;
+            AudioManager.Instance.PlaySFX(clip);
+
+            // If this is the Start/Play button, fade out BGM
+            if (isStartButton)
+                AudioManager.Instance.StopBGM(bgmFadeDuration);
+        }
     }
 
     private void AnimateHover(bool showHover)
     {
-        // Kill active tweens
         transform.DOKill();
-        if (instancedMaterial != null)
-        {
-            instancedMaterial.DOKill();
-        }
+        if (instancedMaterial != null) instancedMaterial.DOKill();
 
-        // 1. Animate Scale
         float targetScaleMultiplier = showHover ? hoverScale : 1.0f;
         Vector3 targetScale = originalScale * targetScaleMultiplier;
-        transform.DOScale(targetScale, duration)
-            .SetEase(easeType)
-            .SetLink(gameObject);
+        transform.DOScale(targetScale, duration).SetEase(easeType).SetLink(gameObject);
 
-        // 2. Animate Shader Progress
         if (instancedMaterial != null)
         {
             float targetProgress = showHover ? 1f : 0f;
             instancedMaterial.DOFloat(targetProgress, "_HoverProgress", duration)
-                .SetEase(easeType)
-                .SetLink(gameObject);
+                .SetEase(easeType).SetLink(gameObject);
         }
     }
 
@@ -118,7 +122,6 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     void OnDisable()
     {
-        // Instantly reset visual state to avoid frozen hovered states when buttons are disabled/hidden
         ResetVisualsInstant();
         isHovered = false;
     }
@@ -129,7 +132,6 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         if (instancedMaterial != null)
         {
             instancedMaterial.DOKill();
-            // Clean up the instantiated material asset to prevent memory leaks in the editor
             Destroy(instancedMaterial);
         }
     }
