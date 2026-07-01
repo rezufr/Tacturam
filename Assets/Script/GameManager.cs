@@ -405,6 +405,31 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    private void PreviewAction(CardAction action, int value, bool flipped)
+    {
+        switch (action)
+        {
+            case CardAction.Move:
+                player.Move(player.facingDirection, value);
+                break;
+            case CardAction.Dash:
+                player.Move(player.facingDirection, value);
+                break;
+            case CardAction.Back:
+                player.Move(-player.facingDirection, value);
+                break;
+            case CardAction.Rotate:
+                // Original: Putar Kanan (1), Flipped: Putar Kiri (-1)
+                player.RotatePlayer(flipped ? -1 : 1);
+                break;
+            case CardAction.Side:
+                // Original: Geser Kanan Player, Flipped: Geser Kiri Player
+                Vector2Int sideDir = player.GetSideDirection(!flipped);
+                player.Move(sideDir, value);
+                break;
+        }
+    }
+
     private void UpdateDeckText()
     {
         if (deckCountText != null) deckCountText.text = deckList.Count.ToString();

@@ -11,6 +11,13 @@ public class TilemapController : MonoBehaviour
     [Header("Tiles")]
     public Tile[] Tile;
 
+    [Header("Telegraph Tiles")]
+    public TileBase moveTile;
+    public TileBase RotateUpTile;
+    public TileBase RotateDownTile;
+    public TileBase RotateLeftTile;
+    public TileBase RotateRightTile;
+    public TileBase AttackTile;
 
     [Header("Gizmos Settings")]
     public Transform player; // Tetap ada cuma buat visualisasi Gizmos saja
@@ -46,6 +53,93 @@ public class TilemapController : MonoBehaviour
             {
                 Tile[i].isActive = true;
                 TelegraphTile(Tile[i]);
+            }
+        }
+    }
+
+    public void CalculateTileTelegraphPlayer(Vector3Int gridPos, Direction dir, int range)
+    {
+        for (int i = 0; i < Tile.Length; i++)
+        {
+            if (Tile[i].tileType != TileType.Telegraph) continue;
+
+            Vector2Int directionVector = dir switch
+            {
+                Direction.Up => Vector2Int.up,
+                Direction.Down => Vector2Int.down,
+                Direction.Left => Vector2Int.left,
+                Direction.Right => Vector2Int.right,
+                _ => Vector2Int.zero
+            };
+
+            for (int j = 1; j <= range; j++)
+            {
+                Vector3Int targetPos = gridPos + new Vector3Int(directionVector.x, directionVector.y, 0) * j;
+                if (CanMoveTo(targetPos))
+                {
+                    if (CheckEnemyIsThere(targetPos))
+                    {
+                        Tile[i].tilemap.SetTile(targetPos, AttackTile);
+                    }
+                    else if (CheckMoveToEnemy(targetPos))
+                    {
+                        Tile[i].tilemap.SetTile(targetPos, AttackTile);
+                    }
+                    else if (directionVector == playerMovement.facingDirection)
+                    {
+                        Tile[i].tilemap.SetTile(targetPos, rotateTileForDirection(dir));
+                    }
+                    else
+                    {
+                        Tile[i].tilemap.SetTile(targetPos, moveTile);
+                    }
+                }
+                else
+                {
+                    break; // Stop jika menemukan tile yang tidak bisa dilewati
+                }
+            }
+        }
+    }
+
+    public TileBase rotateTileForDirection(Direction dir)
+    {
+        return dir switch
+        {
+            Direction.Up => RotateUpTile,
+            Direction.Down => RotateDownTile,
+            Direction.Left => RotateLeftTile,
+            Direction.Right => RotateRightTile,
+            _ => null
+        };
+    }
+
+    public void CalculateTileTelegraphEnemy(Vector3Int gridPos, Direction dir, int range)
+    {
+        for (int i = 0; i < Tile.Length; i++)
+        {
+            if (Tile[i].tileType != TileType.Telegraph) continue;
+
+            Vector3Int directionVector = dir switch
+            {
+                Direction.Up => Vector3Int.up,
+                Direction.Down => Vector3Int.down,
+                Direction.Left => Vector3Int.left,
+                Direction.Right => Vector3Int.right,
+                _ => Vector3Int.zero
+            };
+
+            for (int j = 1; j <= range; j++)
+            {
+                Vector3Int targetPos = gridPos + directionVector * j;
+                if (CanMoveTo(targetPos))
+                {
+                    Tile[i].tilemap.SetTile(targetPos, moveTile);
+                }
+                else
+                {
+                    break; // Stop jika menemukan tile yang tidak bisa dilewati
+                }
             }
         }
     }

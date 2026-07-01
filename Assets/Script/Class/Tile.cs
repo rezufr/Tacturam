@@ -7,6 +7,7 @@ using UnityEngine.Tilemaps;
 public class Tile
 {
     public TilemapRenderer tilemapRenderer;
+    public Tilemap tilemap;
     public TileType tileType;
     public int indexLayer;
     public bool isActive;
