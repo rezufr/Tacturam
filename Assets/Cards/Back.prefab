@@ -91,6 +91,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   actionType: 2
   actionValue: 1
+  cardDescription: Move backward 1 tile.
   hoverHeight: 20
   selectHeight: 40
   hoverScale: 1.05

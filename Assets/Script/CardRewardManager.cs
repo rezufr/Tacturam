@@ -9,11 +9,10 @@ using DG.Tweening;
 public class CardRewardManager : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private GameManager gameManager;            // Fallback helper to find prefabs
-    [SerializeField] private GameObject[] rewardPrefabs;          // Available card rewards in case gameManager is null
-    [SerializeField] private Transform[] rewardSlots;            // Exactly 3 slots (Left page)
-    [SerializeField] private TextMeshProUGUI[] descriptionTexts; // Exactly 3 descriptions (sticky notes)
-    
+    [SerializeField] private GameManager gameManager;
+    [SerializeField] private Transform[] rewardSlots;
+    [SerializeField] private TextMeshProUGUI[] descriptionTexts;
+
     [Header("Buttons")]
     [SerializeField] private Button nextStageButton;
 
@@ -22,77 +21,91 @@ public class CardRewardManager : MonoBehaviour
     [SerializeField] private float selectScale = 1.15f;
     [SerializeField] private float tweenDuration = 0.25f;
 
+    // ---------------- Card Pools ----------------
+
+    [Header("Card Pools")]
+    [Tooltip("Kartu-kartu yang dianggap sebagai 'kartu baru'. Tinggal drag prefab kartu ke sini.")]
+    [SerializeField] private GameObject[] newCardPool;
+
+    [Tooltip("Kartu-kartu yang dianggap sebagai 'kartu random'. Tinggal drag prefab kartu ke sini.")]
+    [SerializeField] private GameObject[] randomCardPool;
+
+    // ---------------- Reward Configuration ----------------
+
+    [System.Serializable]
+    public class StageRewardConfig
+    {
+        public int stageNumber;
+        [Tooltip("Jumlah slot diambil dari New Card Pool")]
+        public int newCardSlots;
+        [Tooltip("Jumlah slot diambil dari Random Card Pool")]
+        public int randomCardSlots;
+    }
+
+    [Header("Reward Rules per Stage")]
+    [Tooltip("Atur kombinasi reward tiap stage. Kalau stage gak ada di list, pake Default Config.")]
+    [SerializeField] private StageRewardConfig[] stageConfigs;
+
+    [Tooltip("Dipake kalau stage sekarang gak ketemu di Stage Configs")]
+    [SerializeField]
+    private StageRewardConfig defaultConfig = new StageRewardConfig
+    {
+        stageNumber = -1,
+        newCardSlots = 0,
+        randomCardSlots = 3
+    };
+
+    [Tooltip("Stage sekarang. Otomatis di-overwrite dari GameManager.currentGameStage saat Start(). Cuma dipakai sebagai fallback/testing manual.")]
+    [SerializeField] private int currentStage = 1;
+
     private GameObject[] instantiatedCards = new GameObject[3];
     private int selectedIndex = -1;
 
     void Start()
     {
-        // Interaksi awal
         if (nextStageButton != null)
         {
             nextStageButton.interactable = false;
             nextStageButton.onClick.AddListener(OnNextStageClicked);
         }
 
-        // Cari GameManager jika belum di-assign
         if (gameManager == null)
         {
             gameManager = FindObjectOfType<GameManager>();
         }
 
+        // Ambil stage sekarang dari GameManager (persist lintas scene), bukan dari field manual
+        currentStage = GameManager.currentGameStage;
+
         GenerateRewardChoices();
     }
 
-    private void GenerateRewardChoices()
+    public void GenerateRewardChoices(int stageOverride = -1)
     {
-        // Tarik daftar prefab kartu dari GameManager jika tersedia
-        GameObject[] availableCards = rewardPrefabs;
-        if (gameManager != null && gameManager.cardPrefabs != null && gameManager.cardPrefabs.Length > 0)
-        {
-            availableCards = gameManager.cardPrefabs;
-        }
+        int stageToUse = stageOverride != -1 ? stageOverride : currentStage;
 
-        if (availableCards == null || availableCards.Length == 0)
-        {
-            Debug.LogError("CardRewardManager: Tidak ada prefab kartu yang tersedia!");
-            return;
-        }
+        StageRewardConfig config = GetConfigForStage(stageToUse);
+        GameObject[] chosenPrefabs = BuildRewardSet(config);
 
-        // Memilih 3 index prefab acak yang unik
-        List<int> chosenIndices = new List<int>();
-        int maxRewards = Mathf.Min(3, availableCards.Length);
-        
-        while (chosenIndices.Count < maxRewards)
-        {
-            int rIdx = Random.Range(0, availableCards.Length);
-            if (!chosenIndices.Contains(rIdx))
-            {
-                chosenIndices.Add(rIdx);
-            }
-        }
-
-        // Spawn kartu di 3 slot UI
         for (int i = 0; i < 3; i++)
         {
-            if (i >= chosenIndices.Count)
+            if (i >= chosenPrefabs.Length || chosenPrefabs[i] == null)
             {
-                if (rewardSlots != null && i < rewardSlots.Length && rewardSlots[i] != null) 
+                if (rewardSlots != null && i < rewardSlots.Length && rewardSlots[i] != null)
                     rewardSlots[i].gameObject.SetActive(false);
-                if (descriptionTexts != null && i < descriptionTexts.Length && descriptionTexts[i] != null) 
+                if (descriptionTexts != null && i < descriptionTexts.Length && descriptionTexts[i] != null)
                     descriptionTexts[i].gameObject.SetActive(false);
                 continue;
             }
 
-            GameObject cardPrefab = availableCards[chosenIndices[i]];
+            GameObject cardPrefab = chosenPrefabs[i];
             Transform slot = (rewardSlots != null && i < rewardSlots.Length) ? rewardSlots[i] : null;
-            
+
             if (slot == null) continue;
 
-            // Spawn Card Object inside the Slot
             GameObject cardObj = Instantiate(cardPrefab, slot);
             instantiatedCards[i] = cardObj;
 
-            // Sesuaikan Anchoring, Posisi, dan Ukuran ke 250x400
             RectTransform cardRT = cardObj.GetComponent<RectTransform>();
             if (cardRT != null)
             {
@@ -100,33 +113,35 @@ public class CardRewardManager : MonoBehaviour
                 cardRT.anchorMax = new Vector2(0.5f, 0.5f);
                 cardRT.pivot = new Vector2(0.5f, 0.5f);
                 cardRT.anchoredPosition = Vector2.zero;
-                cardRT.sizeDelta = new Vector2(200f, 300f); // Ukuran container kartu
+                cardRT.sizeDelta = new Vector2(200f, 300f);
                 cardRT.localScale = Vector3.one;
             }
 
-            // Matikan script controller asli agar tidak bentrok dengan logika drag/flip biasa
             CardController cardCtrl = cardObj.GetComponent<CardController>();
             if (cardCtrl != null)
             {
                 cardCtrl.enabled = false;
 
-                // Samakan ukuran visual container utama objek kartu
                 if (cardCtrl.VisualTransform != null)
                 {
                     cardCtrl.VisualTransform.sizeDelta = new Vector2(200f, 300f);
                 }
 
-                // Samakan ukuran image utama kartu
                 if (cardCtrl.CardImageUI != null)
                 {
                     cardCtrl.CardImageUI.rectTransform.sizeDelta = new Vector2(200f, 300f);
                 }
             }
 
-            // Bind logik klik dan event hover
+            // Matikan Button yang ada di dalam prefab kartu (gak dipakai di reward screen)
+            Button innerButton = cardObj.GetComponentInChildren<Button>();
+            if (innerButton != null)
+            {
+                innerButton.gameObject.SetActive(false);
+            }
+
             SetupSlotInteractions(cardObj, i);
 
-            // Set Deskripsi sticky note
             if (descriptionTexts != null && i < descriptionTexts.Length && descriptionTexts[i] != null)
             {
                 if (cardCtrl != null && !string.IsNullOrEmpty(cardCtrl.cardDescription))
@@ -145,9 +160,78 @@ public class CardRewardManager : MonoBehaviour
         }
     }
 
+    private StageRewardConfig GetConfigForStage(int stage)
+    {
+        if (stageConfigs != null)
+        {
+            foreach (var cfg in stageConfigs)
+            {
+                if (cfg.stageNumber == stage)
+                    return cfg;
+            }
+        }
+        return defaultConfig;
+    }
+
+    private GameObject[] BuildRewardSet(StageRewardConfig config)
+    {
+        GameObject[] result = new GameObject[3];
+        int idx = 0;
+
+        List<GameObject> newPoolCopy = new List<GameObject>(newCardPool ?? new GameObject[0]);
+        List<GameObject> randomPoolCopy = new List<GameObject>(randomCardPool ?? new GameObject[0]);
+
+        // Ambil slot dari New Card Pool
+        for (int i = 0; i < config.newCardSlots && idx < 3; i++)
+        {
+            GameObject picked = PickRandomAndRemove(newPoolCopy);
+            if (picked != null)
+            {
+                result[idx] = picked;
+                idx++;
+            }
+        }
+
+        // Ambil slot dari Random Card Pool
+        for (int i = 0; i < config.randomCardSlots && idx < 3; i++)
+        {
+            GameObject picked = PickRandomAndRemove(randomPoolCopy);
+            if (picked != null)
+            {
+                result[idx] = picked;
+                idx++;
+            }
+        }
+
+        // Fallback kalau masih ada slot kosong (pool kehabisan kartu unik):
+        // isi dari gabungan kedua pool, boleh duplikat antar slot kalau terpaksa
+        while (idx < 3)
+        {
+            List<GameObject> fallbackPool = new List<GameObject>();
+            if (newCardPool != null) fallbackPool.AddRange(newCardPool);
+            if (randomCardPool != null) fallbackPool.AddRange(randomCardPool);
+
+            if (fallbackPool.Count == 0) break; // beneran gak ada kartu sama sekali
+
+            result[idx] = fallbackPool[Random.Range(0, fallbackPool.Count)];
+            idx++;
+        }
+
+        return result;
+    }
+
+    private GameObject PickRandomAndRemove(List<GameObject> pool)
+    {
+        if (pool == null || pool.Count == 0) return null;
+
+        int randomIndex = Random.Range(0, pool.Count);
+        GameObject picked = pool[randomIndex];
+        pool.RemoveAt(randomIndex); // biar gak ke-pick lagi dalam reward yang sama
+        return picked;
+    }
+
     private void SetupSlotInteractions(GameObject cardObj, int index)
     {
-        // Tambahkan Button untuk intercept klik pada kartu
         Button btn = cardObj.GetComponent<Button>();
         if (btn == null) btn = cardObj.AddComponent<Button>();
 
@@ -155,17 +239,14 @@ public class CardRewardManager : MonoBehaviour
         btn.onClick.RemoveAllListeners();
         btn.onClick.AddListener(() => OnCardClicked(index));
 
-        // Tambahkan EventTrigger untuk Hover feedback
         EventTrigger trigger = cardObj.GetComponent<EventTrigger>();
         if (trigger == null) trigger = cardObj.AddComponent<EventTrigger>();
         trigger.triggers.Clear();
 
-        // Pointer Enter
         EventTrigger.Entry entryEnter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
         entryEnter.callback.AddListener((data) => OnCardHover(index, true));
         trigger.triggers.Add(entryEnter);
 
-        // Pointer Exit
         EventTrigger.Entry entryExit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
         entryExit.callback.AddListener((data) => OnCardHover(index, false));
         trigger.triggers.Add(entryExit);
@@ -187,7 +268,6 @@ public class CardRewardManager : MonoBehaviour
     {
         if (selectedIndex == index) return;
 
-        // Reset visual kartu yang sebelumnya dipilih
         if (selectedIndex != -1)
         {
             GameObject prevCard = instantiatedCards[selectedIndex];
@@ -201,7 +281,6 @@ public class CardRewardManager : MonoBehaviour
 
         selectedIndex = index;
 
-        // Visual feedback untuk kartu yang diklik
         GameObject selected = instantiatedCards[selectedIndex];
         if (selected != null)
         {
@@ -210,7 +289,6 @@ public class CardRewardManager : MonoBehaviour
             SetCardAlpha(selected, 1.0f);
         }
 
-        // Dim (redupkan) kartu-kartu lainnya
         for (int i = 0; i < instantiatedCards.Length; i++)
         {
             if (i != selectedIndex && instantiatedCards[i] != null)
@@ -221,7 +299,6 @@ public class CardRewardManager : MonoBehaviour
             }
         }
 
-        // Aktifkan tombol Next Stage
         if (nextStageButton != null)
         {
             nextStageButton.interactable = true;
@@ -240,15 +317,25 @@ public class CardRewardManager : MonoBehaviour
     {
         if (selectedIndex == -1) return;
 
+        // Simpen dulu kartu yang dipilih, TAPI belum pindah scene
         GameObject chosenCard = instantiatedCards[selectedIndex];
         if (chosenCard != null)
         {
-            // Ambil nama prefab asli
             string cleanName = chosenCard.name.Replace("(Clone)", "").Trim();
             GameManager.AddCardToPermanentDeck(cleanName);
         }
 
-        // Load kembali scene permainan
+        // Scene TIDAK langsung berpindah di sini.
+        // Tombol arrow (ShipPathController) yang akan trigger perpindahan scene
+        // setelah animasi kapal selesai jalan, lewat ConfirmCardSelectionAndProceed()
+    }
+
+    // Dipanggil dari ShipPathController setelah animasi kapal selesai
+    public void ConfirmCardSelectionAndProceed()
+    {
+        GameManager.currentGameStage++;
+        Debug.Log($"[CardRewardManager] Stage naik jadi {GameManager.currentGameStage}. Loading gameplay scene...");
+
         SceneManager.LoadScene("SampleScene");
     }
 
@@ -257,19 +344,19 @@ public class CardRewardManager : MonoBehaviour
         switch (card.actionType)
         {
             case CardAction.Move:
-                return $"Move {card.actionValue} step{(card.actionValue > 1 ? "s" : "")} forward.";
+                return "Move forward 1 tile.";
             case CardAction.Dash:
-                return $"Dash forward by {card.actionValue} tiles.";
+                return "Dash forward 2 tiles.";
             case CardAction.Back:
-                return $"Move backward by {card.actionValue} tiles.";
+                return "Move backward 1 tile.";
             case CardAction.Rotate:
-                return card.IsFlipped ? "Rotate 90 degrees counter-clockwise." : "Rotate 90 degrees clockwise.";
+                return "Rotate your character's facing direction.";
             case CardAction.Side:
-                return card.IsFlipped ? "Slide 1 tile to the left." : "Slide 1 tile to the right.";
+                return "Step sideways to the tile beside your character.";
             case CardAction.Copy:
-                return "Duplicate the effect of your previous action.";
+                return "Copy the effect of the previously played card.";
             default:
-                return "Move two steps and ignore the negative tile.";
+                return "Move forward 1 tile.";
         }
     }
 }

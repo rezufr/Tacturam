@@ -15,7 +15,6 @@ public class SettingsMenuController : SwingingMenuPanel
 
     [SerializeField] private AudioClip clickSFX; // Reference to the AudioClip for click sound effects
 
-
     public void OpenSettings() => OpenPanel();
 
     /// <summary>Kept for existing Editor event bindings.</summary>
@@ -28,6 +27,6 @@ public class SettingsMenuController : SwingingMenuPanel
 
     public void Play()
     {
-        SceneManager.LoadScene("SampleScene");
+        SceneManager.LoadScene("RewardTest");
     }
 }

@@ -91,6 +91,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   actionType: 3
   actionValue: 1
+  cardDescription: Rotate your character's facing direction.
   hoverHeight: 20
   selectHeight: 40
   hoverScale: 1.05
