@@ -27,6 +27,6 @@ public class SettingsMenuController : SwingingMenuPanel
 
     public void Play()
     {
-        SceneManager.LoadScene("RewardTest");
+        SceneManager.LoadScene("SampleScene");
     }
 }
