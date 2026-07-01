@@ -21,6 +21,7 @@ public class GameManager : MonoBehaviour
 
     [Header("Game Settings")]
     public int startingDeckSize = 20;
+    public bool isPlayerTurn = true;
 
     [Header("Player Reference")]
     public PlayerMovement player;
@@ -32,11 +33,13 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float drawDelayAfterPlay = 0.8f; // Tunggu berapa lama setelah kartu terakhir 'pamer' baru draw
     [SerializeField] private float drawStaggerDelay = 0.15f;  // Jeda antar kartu yang di-draw
 
-    private List<GameObject> deckList = new List<GameObject>();
+    [SerializeField] private List<GameObject> deckList = new List<GameObject>();
+    [SerializeField] private List<GameObject> takenCards = new List<GameObject>();
     private bool isPlayingSequence = false;
 
     // Permanent deck registry persisting across scene reloads
     public static List<string> permanentDeckNames = new List<string>();
+    public static List<string> takenCardNames = new List<string>();
 
     // Untuk fitur Copy
     private CardAction lastActionType;
@@ -72,8 +75,8 @@ public class GameManager : MonoBehaviour
 
     private void InitializeDeck()
     {
-        deckList.Clear();
-        
+        // deckList.Clear();
+
         if (permanentDeckNames != null && permanentDeckNames.Count > 0)
         {
             Debug.Log($"[GameManager] Loading deck from permanent deck registry ({permanentDeckNames.Count} cards).");
@@ -88,17 +91,12 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.Log("[GameManager] Permanent deck registry is empty. Initializing a new random deck.");
+            Debug.Log("[GameManager] Permanent deck registry is empty. Initializing a default deck.");
             permanentDeckNames = new List<string>();
-            for (int i = 0; i < startingDeckSize; i++)
+            for (int i = 0; i < deckList.Count; i++)
             {
-                if (cardPrefabs.Length > 0)
-                {
-                    int randomIndex = Random.Range(0, cardPrefabs.Length);
-                    GameObject selectedPrefab = cardPrefabs[randomIndex];
-                    deckList.Add(selectedPrefab);
-                    permanentDeckNames.Add(selectedPrefab.name);
-                }
+                GameObject prefab = deckList[i];
+                permanentDeckNames.Add(prefab.name);
             }
         }
         ShuffleDeck();
@@ -112,6 +110,85 @@ public class GameManager : MonoBehaviour
             int randomIndex = Random.Range(i, deckList.Count);
             deckList[i] = deckList[randomIndex];
             deckList[randomIndex] = temp;
+        }
+    }
+
+    public void SetEnemyMove(int index)
+    {
+        enemy[index].SetMove(EnemyState.Moving);
+    }
+
+    public void SetEnemyRotate(int index)
+    {
+        print("[GameManager] Enemy rotate action triggered.");
+
+        enemy[index].SetMove(EnemyState.Rotating);
+    }
+
+    public void PlayEnemy()
+    {
+        isPlayerTurn = false; // Set turn ke musuh
+        StartCoroutine(EnemySequence());
+    }
+
+    IEnumerator EnemySequence()
+    {
+        for (int i = 0; i < enemy.Length; i++)
+        {
+            if (enemy[i] == null)
+                continue;
+
+            SetEnemyMove(i);
+
+            yield return new WaitUntil(() => !enemy[i].IsMoving);
+        }
+
+        print("Semua enemy selesai.");
+        isPlayerTurn = true; // Set turn ke player
+    }
+
+    public void DiscardCardInHand(int amount)
+    {
+        CardController[] allCards = handContainer.GetComponentsInChildren<CardController>();
+
+        for (int i = 0; i < amount; i++) // Loop sebanyak jumlah kartu yang ingin dibuang
+        {
+            for (int j = 0; j < allCards.Length; j++) // gimana cara ngambil yang terakhir aja? biar ga semua diambil
+            {
+                if (j == 0)
+                {
+                    GameObject prefab = FindPrefabInArray(allCards[j].gameObject.name);
+                    takenCards.Add(prefab); // Ambil kartu terakhir di tangan
+                    takenCardNames.Add(allCards[j].gameObject.name); // Tambahkan nama kartu ke daftar kartu yang diambil
+                    allCards[j].PlayVanishPhase(); // Mainkan animasi hilang
+                }
+            }
+        }
+    }
+
+    public void DiscardCardPermanently(int amount)
+    {
+        CardController[] allCards = handContainer.GetComponentsInChildren<CardController>();
+
+        for (int i = 0; i < amount; i++) // Loop sebanyak jumlah kartu yang ingin dibuang
+        {
+            if (deckList.Count > 0)
+            {
+                print($"Discarding card permanently. Deck size before: {deckList.Count}");
+                deckList.RemoveAt(deckList.Count - 1); // Hapus kartu terakhir dari deck
+                UpdateDeckText();
+            }
+            else
+            {
+                for (int j = 0; j < allCards.Length; j++) // gimana cara ngambil yang terakhir aja? biar ga semua diambil
+                {
+                    if (j == allCards.Length - 1) // Ambil kartu terakhir di tangan
+                    {
+                        allCards[j].PlayVanishPhase(); // Mainkan animasi hilang
+                    }
+                }
+            }
+
         }
     }
 
@@ -150,7 +227,7 @@ public class GameManager : MonoBehaviour
         for (int i = 0; i < selectedCards.Count; i++)
         {
             CardController card = selectedCards[i];
-            
+
             // Eksekusi Aksi Player
             ExecuteCardAction(card);
 
@@ -164,29 +241,31 @@ public class GameManager : MonoBehaviour
 
         // Tunggu sebentar saja baru mulai draw kartu baru
         yield return new WaitForSeconds(drawDelayAfterPlay);
+        PlayEnemy(); // Jalankan aksi musuh setelah player selesai main kartu
+        yield return new WaitUntil(() => isPlayerTurn); // Tunggu sebentar sebelum menggambar kartu baru
         StartCoroutine(DrawCardsSequence(selectedCards.Count, 0f));
-        
+
         isPlayingSequence = false;
     }
 
     public void OnRecycleButtonClicked()
     {
         if (isPlayingSequence) return;
-        
+
         CardController[] cardsInHand = handContainer.GetComponentsInChildren<CardController>();
         int count = 0;
         foreach (var c in cardsInHand)
         {
-            if (c.IsSelected) 
-            { 
+            if (c.IsSelected)
+            {
                 deckList.Add(FindPrefabInArray(c.gameObject.name));
-                
+
                 // SAFETY: Matikan semua animasi sebelum Destroy
                 c.transform.DOKill();
                 DOTween.Kill(c.gameObject);
-                
-                Destroy(c.gameObject); 
-                count++; 
+
+                Destroy(c.gameObject);
+                count++;
             }
         }
 
@@ -219,6 +298,30 @@ public class GameManager : MonoBehaviour
                 yield return new WaitForSeconds(drawStaggerDelay);
             }
             else break;
+        }
+    }
+
+    public void DrawTakenCards()
+    {
+        if (takenCards.Count == 0) return;
+        GameObject cardToDraw = takenCards[0].gameObject;
+        takenCards.RemoveAt(0);
+        deckList.Add(cardToDraw);
+
+        // Spawn di dalam handContainer (untuk ikut layout), tapi posisi awalnya di atas deck
+        GameObject newCard = Instantiate(cardToDraw, handContainer);
+        UpdateDeckText();
+
+        // Jalankan animasi dari posisi deck ke posisi di tangan
+        CardController cardCtrl = newCard.GetComponent<CardController>();
+        if (cardCtrl != null && deckTransform != null)
+        {
+            // Konversi posisi dunia deck ke posisi lokal di dalam handContainer
+            Vector2 deckLocalPos = handContainer is RectTransform handRT
+                ? (Vector2)handRT.InverseTransformPoint(deckTransform.position)
+                : Vector2.zero;
+
+            cardCtrl.PlayDrawAnimation(deckLocalPos);
         }
     }
 

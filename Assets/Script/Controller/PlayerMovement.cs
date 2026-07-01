@@ -7,11 +7,13 @@ public class PlayerMovement : MonoBehaviour
 {
     [Header("References")]
     public TilemapController tilemapController;
+    public GameManager gameManager;
 
     [Header("Settings")]
     public float moveSpeed = 7f;    // Kecepatan gerak (Velocity)
     public float stepDelay = 0.05f; // Jeda antar langkah
     public int damage = 1; // Jumlah damage player
+    public int takenCardCount = 0; // Jumlah kartu yang diambil dari musuh
 
     [Header("Orientation")]
     public Vector2Int facingDirection = Vector2Int.down; // Arah hadap awal (Down)
@@ -22,11 +24,18 @@ public class PlayerMovement : MonoBehaviour
 
     [Header("Animation")]
     public Animator playerAnimator;
+    public SpriteRenderer playerSpriteRenderer;
 
     /// <summary>
     /// Berputar 90 derajat. 
     /// rotDir: 1 untuk Kanan (Clockwise), -1 untuk Kiri (Counter-Clockwise)
     /// </summary>
+
+    void Start()
+    {
+        tilemapController.CalculateLayerForCharacter(transform, playerSpriteRenderer); // Update sorting order saat start
+    }
+
     public void RotatePlayer(int rotDir)
     {
         if (isMoving) return;
@@ -194,7 +203,21 @@ public class PlayerMovement : MonoBehaviour
             transform.position = Vector3.MoveTowards(transform.position, targetPos, moveSpeed * Time.deltaTime);
             yield return null;
         }
+        tilemapController.CalculateLayerForCharacter(transform, playerSpriteRenderer); // Update sorting order saat bergerak
         transform.position = targetPos;
+    }
+
+    public void DestroyCard(int amount)
+    {
+        print($"Destroying {amount} card(s) from hand.");
+        gameManager.DiscardCardPermanently(amount);
+    }
+
+    public void DiscardCardInHand(int amount)
+    {
+        print($"Discarding {amount} card(s) from hand.");
+        gameManager.DiscardCardInHand(amount);
+        takenCardCount += amount; // Update jumlah kartu yang diambil dari musuh
     }
 
     public void AnimationPlayer(int actionValue)

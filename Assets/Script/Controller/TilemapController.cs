@@ -11,11 +11,15 @@ public class TilemapController : MonoBehaviour
     [Header("Tiles")]
     public Tile[] Tile;
 
+
     [Header("Gizmos Settings")]
     public Transform player; // Tetap ada cuma buat visualisasi Gizmos saja
     public PlayerMovement playerMovement; // Tetap ada cuma buat visualisasi Gizmos saja
+    public EnemyMovement[] enemyMovement; // Tetap ada cuma buat visualisasi Gizmos saja
     public Transform[] enemy;
 
+    public int neighborRange = 1; // Jarak neighbor yang diperiksa (default 1)
+    public Dir[] neighborDirections; // Arah neighbor yang diperiksa
 
     void Start()
     {
@@ -32,6 +36,28 @@ public class TilemapController : MonoBehaviour
                 BlockTile(Tile[i]);
             }
         }
+    }
+
+    public void CalculateTilemapTelegraph()
+    {
+        for (int i = 0; i < Tile.Length; i++)
+        {
+            if (Tile[i].tileType == TileType.Telegraph)
+            {
+                Tile[i].isActive = true;
+                TelegraphTile(Tile[i]);
+            }
+        }
+    }
+
+    public void CalculateLayerForCharacter(Transform character, SpriteRenderer spr) // check apakah player atau enemy ada di tile paling atas atau bawah jadi kalkulasi semua baris y agar bisa tentukan sorting order player atau enemy
+    {
+        BoundsInt bounds = gridTilemap.cellBounds;
+
+        Vector3Int cell = gridTilemap.WorldToCell(character.position);
+
+        int sortingOrder = bounds.yMax - cell.y + 1; // agar sorting order dimulai dari 1, bukan 0, karena tilemap sorting order dimulai dari 1
+        spr.sortingOrder = sortingOrder;
     }
 
     public bool IsTileWalkable(Vector3Int gridPos)
@@ -67,33 +93,46 @@ public class TilemapController : MonoBehaviour
         return IsTileWalkable(gridPos) && !IsTileBlocked(gridPos);
     }
 
-    public bool CheckMoveToPlayer(Vector3Int gridPos) // check apakah ada player di gridPos neighbor, jika ada return true, jika tidak ada return false
+    public bool CheckMoveToPlayer(Vector3Int gridPos, EnemyMovement enemyMovement) // check apakah ada player di gridPos neighbor, jika ada return true, jika tidak ada return false
     {
-        if (player == null || gridTilemap == null) return true;
+        if (player == null || gridTilemap == null) return false;
+
+        Vector3Int targetCheckPos = gridPos +
+            new Vector3Int(
+                enemyMovement.facingDirection.x,
+                enemyMovement.facingDirection.y,
+                0
+            );
+
         Vector3Int playerGridPos = gridTilemap.WorldToCell(player.position);
-        Vector3Int[] neighbors = { Vector3Int.up, Vector3Int.down, Vector3Int.left, Vector3Int.right };
-        foreach (var dir in neighbors)
-        {
-            Vector3Int neighborPos = playerGridPos + dir;
-            if (neighborPos == gridPos) return true;
-        }
+        if (playerGridPos == targetCheckPos)
+            return true;
+
         return false;
     }
 
-    public bool CheckMoveToEnemy(Vector3Int gridPos) // check apakah ada enemy di gridPos neighbor, jika ada return true, jika tidak ada return false
+    public bool CheckMoveToEnemy(Vector3Int gridPos)
     {
-        if (enemy == null || gridTilemap == null) return true;
+        if (enemy == null || gridTilemap == null)
+            return false;
+
+        Vector3Int targetCheckPos = gridPos +
+            new Vector3Int(
+                playerMovement.facingDirection.x,
+                playerMovement.facingDirection.y,
+                0
+            );
+
         foreach (var e in enemy)
         {
             if (e == null) continue;
-            Vector3Int enemyGridPos = gridTilemap.WorldToCell(e.position);
-            Vector3Int[] neighbors = { Vector3Int.up, Vector3Int.down, Vector3Int.left, Vector3Int.right };
-            foreach (var dir in neighbors)
-            {
-                Vector3Int neighborPos = enemyGridPos + dir;
-                if (neighborPos == gridPos) return true;
-            }
+
+            Vector3Int enemyPos = gridTilemap.WorldToCell(e.position);
+
+            if (enemyPos == targetCheckPos)
+                return true;
         }
+
         return false;
     }
 
@@ -107,6 +146,71 @@ public class TilemapController : MonoBehaviour
             if (enemyGridPos == gridPos) return true;
         }
         return false;
+    }
+
+    public bool CheckPlayerIsThere(Vector3Int gridPos) // check apakah ada player di gridPos, jika ada return true, jika tidak ada return false
+    {
+        if (player == null || gridTilemap == null) return true;
+        Vector3Int playerGridPos = gridTilemap.WorldToCell(player.position);
+        if (playerGridPos == gridPos) return true;
+        return false;
+    }
+
+    public bool AttackPlayerAt(Vector3Int gridPos, int amount, EnemyType enemyType)
+    {
+        if (player == null || gridTilemap == null) return false;
+        Vector3Int playerGridPos = gridTilemap.WorldToCell(player.position);
+        if (playerGridPos == gridPos)
+        {
+            PlayerMovement playerMovement = player.GetComponent<PlayerMovement>();
+            if (playerMovement != null)
+            {
+                print($"Attacking player at {gridPos}.");
+                if (enemyType == EnemyType.Hook)
+                {
+                    playerMovement.DestroyCard(amount); // Misal damage 1
+                }
+                else if (enemyType == EnemyType.Nebelss)
+                {
+                    playerMovement.DiscardCardInHand(amount); // Misal discard 1 kartu
+                }
+                else
+                {
+                    print("Unknown enemy type. No action taken.");
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public bool AttackPlayerAtNeighbor(Vector3Int enemyGridPos, int amount, EnemyType enemyType, EnemyMovement enemyMovement)
+    {
+        if (player == null || gridTilemap == null)
+            return false;
+
+        Vector3Int playerGridPos = gridTilemap.WorldToCell(player.position);
+
+        Vector3Int attackPos = enemyGridPos +
+            new Vector3Int(
+                enemyMovement.facingDirection.x,
+                enemyMovement.facingDirection.y,
+                0
+            );
+
+        if (attackPos != playerGridPos)
+            return false;
+
+        if (enemyType == EnemyType.Hook)
+        {
+            playerMovement.DestroyCard(amount);
+        }
+        else if (enemyType == EnemyType.Nebelss)
+        {
+            playerMovement.DiscardCardInHand(amount);
+        }
+
+        return true;
     }
 
     public bool AttackEnemyAt(Vector3Int gridPos, int damage)
@@ -133,25 +237,27 @@ public class TilemapController : MonoBehaviour
     public bool AttackEnemyAtNeighbor(Vector3Int gridPos, int damage)
     {
         if (enemy == null || gridTilemap == null) return false;
-        Vector3Int[] neighbors = { Vector3Int.up, Vector3Int.down, Vector3Int.left, Vector3Int.right };
+        Vector2Int[] neighbors = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
         foreach (var dir in neighbors)
         {
-            Vector3Int neighborPos = gridPos + dir;
-            foreach (var e in enemy)
+            if (dir == playerMovement.facingDirection) // Hanya cek arah yang sama dengan facing direction player
             {
-                if (e == null) continue;
-                Vector3Int enemyGridPos = gridTilemap.WorldToCell(e.position);
-                if (enemyGridPos == neighborPos)
+                Vector3Int dir3 = new Vector3Int(dir.x, dir.y, 0);
+                Vector3Int neighborPos = gridPos + dir3;
+                foreach (var e in enemy)
                 {
-                    EnemyMovement enemyMovement = e.GetComponent<EnemyMovement>();
-                    if (enemyMovement != null)
+                    if (e == null) continue;
+                    Vector3Int enemyGridPos = gridTilemap.WorldToCell(e.position);
+                    if (enemyGridPos == neighborPos)
                     {
-                        playerMovement.facingDirection = (Vector2Int)dir; // Set facing direction player ke arah musuh
-                        // playerMovement.UpdateVisualRotation();
-                        print($"Attacking enemy at {neighborPos} for {damage} damage.");
-                        return enemyMovement.TakeDamage(damage);
+                        EnemyMovement enemyMovement = e.GetComponent<EnemyMovement>();
+                        if (enemyMovement != null)
+                        {
+                            print($"Attacking enemy at {neighborPos} for {damage} damage.");
+                            return enemyMovement.TakeDamage(damage);
+                        }
+                        break;
                     }
-                    break;
                 }
             }
         }
@@ -228,15 +334,19 @@ public class TilemapController : MonoBehaviour
         if (player != null && gridTilemap != null)
         {
             Vector3Int pGridPos = gridTilemap.WorldToCell(player.position);
-            Vector3Int[] neighbors = { Vector3Int.up, Vector3Int.down, Vector3Int.left, Vector3Int.right };
+            Vector2Int[] neighbors = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
 
             foreach (var dir in neighbors)
             {
-                Vector3Int targetPos = pGridPos + dir;
-                if (CanMoveTo(targetPos))
+                if (dir == playerMovement.facingDirection)
                 {
-                    Gizmos.color = Color.green;
-                    Gizmos.DrawWireCube(gridTilemap.GetCellCenterWorld(targetPos), gridTilemap.cellSize * 1.05f);
+                    Vector3Int dir3 = new Vector3Int(dir.x, dir.y, 0);
+                    Vector3Int targetPos = pGridPos + dir3;
+                    if (CanMoveTo(targetPos))
+                    {
+                        Gizmos.color = Color.green;
+                        Gizmos.DrawWireCube(gridTilemap.GetCellCenterWorld(targetPos), gridTilemap.cellSize * 1.05f);
+                    }
                 }
             }
             Gizmos.color = Color.green;
@@ -248,20 +358,29 @@ public class TilemapController : MonoBehaviour
             foreach (var e in enemy)
             {
                 if (e == null) continue;
-                Vector3Int eGridPos = gridTilemap.WorldToCell(e.position);
-                Vector3Int[] neighbors = { Vector3Int.up, Vector3Int.down, Vector3Int.left, Vector3Int.right };
-
-                foreach (var dir in neighbors)
+                EnemyMovement enemyMovement = e.GetComponent<EnemyMovement>();
+                for (int i = 0; i < enemyMovement.rangeNeighbor; i++)
                 {
-                    Vector3Int targetPos = eGridPos + dir;
-                    if (CanMoveTo(targetPos))
+
+                    Vector3Int eGridPos = gridTilemap.WorldToCell(e.position);
+                    Vector2Int[] neighbors = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+
+                    foreach (var dir in neighbors)
                     {
-                        Gizmos.color = Color.yellow;
-                        Gizmos.DrawWireCube(gridTilemap.GetCellCenterWorld(targetPos), gridTilemap.cellSize * 1.05f);
+                        if (dir == enemyMovement.facingDirection)
+                        {
+                            Vector3Int dir3 = new Vector3Int(dir.x, dir.y, 0);
+                            Vector3Int targetPos = eGridPos + dir3 * (i + 1); // Jarak neighbor sesuai range
+                            if (CanMoveTo(targetPos))
+                            {
+                                Gizmos.color = Color.yellow;
+                                Gizmos.DrawWireCube(gridTilemap.GetCellCenterWorld(targetPos), gridTilemap.cellSize * 1.05f);
+                            }
+                        }
                     }
+                    Gizmos.color = Color.yellow;
+                    Gizmos.DrawWireSphere(gridTilemap.GetCellCenterWorld(eGridPos), 0.3f);
                 }
-                Gizmos.color = Color.yellow;
-                Gizmos.DrawWireSphere(gridTilemap.GetCellCenterWorld(eGridPos), 0.3f);
             }
         }
     }
