@@ -1285,10 +1285,10 @@ RectTransform:
   - {fileID: 1402882376}
   m_Father: {fileID: 739568547}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.5, y: 0.5}
-  m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 4572.6704, y: -0.000028431416}
-  m_SizeDelta: {x: 10000, y: 900}
+  m_AnchorMin: {x: 0, y: 0.5}
+  m_AnchorMax: {x: 1, y: 0.5}
+  m_AnchoredPosition: {x: 4571.6704, y: -0.000030517578}
+  m_SizeDelta: {x: 9158, y: 900}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &537824514
 MonoBehaviour:
@@ -1556,10 +1556,11 @@ MonoBehaviour:
   - {fileID: 1586240584}
   - {fileID: 806312563}
   arrowButton: {fileID: 948793596}
-  speedPerSegment: 10
+  speedPerSegment: 2
   easeType: 4
   rotateShipToDirection: 1
-  delayBeforeSceneChange: 1
+  delayBeforeSceneChange: 0.5
+  nextSceneName: Level 1
 --- !u!222 &719694961
 CanvasRenderer:
   m_ObjectHideFlags: 0
