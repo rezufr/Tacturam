@@ -9,6 +9,7 @@ public class GameManager : MonoBehaviour
     [Header("References")]
     [Tooltip("Parent object tempat kartu-kartu berada")]
     public Transform handContainer;
+    public Canvas rewardCanvas;
 
     [Tooltip("Kumpulan prefab kartu yang tersedia dalam game")]
     public GameObject[] cardPrefabs;
@@ -212,6 +213,12 @@ public class GameManager : MonoBehaviour
     public void OnPlayButtonClicked()
     {
         StartCoroutine(PlayCardsSequence());
+    }
+
+    public void OnPlayerReachFinish()
+    {
+        Debug.Log("[GameManager] Player reached the finish tile! Loading RewardUI scene...");
+        rewardCanvas.gameObject.SetActive(true);
     }
 
     private IEnumerator PlayCardsSequence()

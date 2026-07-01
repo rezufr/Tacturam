@@ -157,6 +157,13 @@ public class PlayerMovement : MonoBehaviour
                     }
                 }
 
+                if (tilemapController.IsTileType(targetGridPos, TileType.Finish))
+                {
+                    Debug.Log("Player reached the finish tile!");
+                    gameManager.OnPlayerReachFinish();
+                    break; // Hentikan pergerakan setelah mencapai tile Finish
+                }
+
                 // Cek efek tile setelah sampai
                 if (tilemapController.IsTileType(targetGridPos, TileType.Stop))
                 {
