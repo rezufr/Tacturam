@@ -27,16 +27,19 @@ public class GameManager : MonoBehaviour
     [Header("Player Reference")]
     public PlayerMovement player;
     public EnemyMovement[] enemy;
+    public TilemapController tilemapController;
 
     [Header("Animation & Timings")]
     [SerializeField] private float playStaggerDelay = 0.25f; // Jeda antar kartu mulai menghilang
     [SerializeField] private float cardShowDuration = 0.5f;  // Berapa lama kartu "pamer" sebelum hilang
     [SerializeField] private float drawDelayAfterPlay = 0.8f; // Tunggu berapa lama setelah kartu terakhir 'pamer' baru draw
     [SerializeField] private float drawStaggerDelay = 0.15f;  // Jeda antar kartu yang di-draw
+    [SerializeField] private float enemyTelegraphDelay = 0.4f;
 
     [SerializeField] private List<GameObject> deckList = new List<GameObject>();
     [SerializeField] private List<GameObject> takenCards = new List<GameObject>();
     private bool isPlayingSequence = false;
+    private int lastTelegraphPreviewHash = int.MinValue;
 
     // Permanent deck registry persisting across scene reloads
     public static List<string> permanentDeckNames = new List<string>();
@@ -55,10 +58,15 @@ public class GameManager : MonoBehaviour
     {
         InitializeDeck();
         UpdateDeckText();
+        ResolveTilemapController();
+        RefreshTelegraphPreview(true);
+        ShowEnemyTelegraphsForPlayerTurn();
     }
 
     void Update()
     {
+        RefreshTelegraphPreview();
+
         // Testing trigger for UI/reward integration
         if (Input.GetKeyDown(KeyCode.R))
         {
@@ -144,6 +152,10 @@ public class GameManager : MonoBehaviour
     public void PlayEnemy()
     {
         isPlayerTurn = false; // Set turn ke musuh
+        if (tilemapController != null)
+        {
+            tilemapController.ClearEnemyTelegraphPreview();
+        }
         StartCoroutine(EnemySequence());
     }
 
@@ -159,6 +171,7 @@ public class GameManager : MonoBehaviour
             yield return new WaitUntil(() => !enemy[i].IsMoving);
         }
 
+        ShowEnemyTelegraphsForPlayerTurn();
         print("Semua enemy selesai.");
         isPlayerTurn = true; // Set turn ke player
     }
@@ -212,6 +225,12 @@ public class GameManager : MonoBehaviour
 
     public void OnPlayButtonClicked()
     {
+        if (tilemapController != null)
+        {
+            tilemapController.ClearTelegraphPreview();
+        }
+
+        lastTelegraphPreviewHash = int.MinValue;
         StartCoroutine(PlayCardsSequence());
     }
 
@@ -224,6 +243,13 @@ public class GameManager : MonoBehaviour
     private IEnumerator PlayCardsSequence()
     {
         if (isPlayingSequence || handContainer == null) yield break;
+
+        if (tilemapController != null)
+        {
+            tilemapController.ClearTelegraphPreview();
+        }
+
+        lastTelegraphPreviewHash = int.MinValue;
 
         CardController[] allCards = handContainer.GetComponentsInChildren<CardController>();
         List<CardController> selectedCards = new List<CardController>();
@@ -425,6 +451,91 @@ public class GameManager : MonoBehaviour
                 player.Move(sideDir, value);
                 break;
         }
+    }
+
+    private void ResolveTilemapController()
+    {
+        if (tilemapController != null)
+            return;
+
+        if (player != null && player.tilemapController != null)
+        {
+            tilemapController = player.tilemapController;
+            return;
+        }
+
+        tilemapController = FindObjectOfType<TilemapController>();
+    }
+
+    private void RefreshTelegraphPreview(bool forceRefresh = false)
+    {
+        if (!isPlayerTurn)
+            return;
+
+        ResolveTilemapController();
+
+        if (tilemapController == null || player == null || handContainer == null || tilemapController.gridTilemap == null)
+        {
+            if (tilemapController != null)
+            {
+                tilemapController.ClearTelegraphPreview();
+            }
+
+            lastTelegraphPreviewHash = int.MinValue;
+            return;
+        }
+
+        if (isPlayingSequence)
+        {
+            tilemapController.ClearTelegraphPreview();
+            lastTelegraphPreviewHash = int.MinValue;
+            return;
+        }
+
+        CardController[] allCards = handContainer.GetComponentsInChildren<CardController>();
+        List<CardController> selectedCards = new List<CardController>();
+
+        int previewHash = 17;
+        for (int i = 0; i < allCards.Length; i++)
+        {
+            CardController card = allCards[i];
+            if (card == null || !card.IsSelected)
+                continue;
+
+            selectedCards.Add(card);
+
+            unchecked
+            {
+                previewHash = previewHash * 31 + card.actionType.GetHashCode();
+                previewHash = previewHash * 31 + card.actionValue;
+                previewHash = previewHash * 31 + (card.IsFlipped ? 1 : 0);
+                previewHash = previewHash * 31 + card.transform.GetSiblingIndex();
+            }
+        }
+
+        if (!forceRefresh && previewHash == lastTelegraphPreviewHash)
+            return;
+
+        lastTelegraphPreviewHash = previewHash;
+
+        if (selectedCards.Count == 0)
+        {
+            tilemapController.ClearTelegraphPreview();
+            return;
+        }
+
+        Vector3Int startGridPos = tilemapController.gridTilemap.WorldToCell(player.transform.position);
+        tilemapController.BuildTelegraphPreview(startGridPos, player.facingDirection, selectedCards);
+    }
+
+    private void ShowEnemyTelegraphsForPlayerTurn()
+    {
+        ResolveTilemapController();
+
+        if (tilemapController == null || enemy == null)
+            return;
+
+        tilemapController.BuildAllEnemyTelegraphPreview(enemy);
     }
 
     private void PreviewAction(CardAction action, int value, bool flipped)

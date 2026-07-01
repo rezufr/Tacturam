@@ -19,6 +19,12 @@ public class TilemapController : MonoBehaviour
     public TileBase RotateRightTile;
     public TileBase AttackTile;
 
+    [Header("Telegraph Preview Tilemap")]
+    public Tilemap telegraphPreviewTilemap;
+
+    [Header("Enemy Telegraph Preview Tilemap")]
+    public Tilemap enemyTelegraphPreviewTilemap;
+
     [Header("Gizmos Settings")]
     public Transform player; // Tetap ada cuma buat visualisasi Gizmos saja
     public PlayerMovement playerMovement; // Tetap ada cuma buat visualisasi Gizmos saja
@@ -27,6 +33,15 @@ public class TilemapController : MonoBehaviour
 
     public int neighborRange = 1; // Jarak neighbor yang diperiksa (default 1)
     public Dir[] neighborDirections; // Arah neighbor yang diperiksa
+
+    [Header("Telegraph Preview (Tilemap)")]
+    [SerializeField] private TileBase previewPathTile;
+    [SerializeField] private TileBase previewEndTile;
+    [SerializeField] private Color enemyTelegraphColor = new Color(1f, 0.2f, 0.2f, 0.85f);
+
+    private readonly Dictionary<Vector3Int, TileBase> telegraphPreviewTiles = new Dictionary<Vector3Int, TileBase>();
+    private readonly Dictionary<Vector3Int, TileBase> enemyTelegraphPreviewTiles = new Dictionary<Vector3Int, TileBase>();
+    private bool hasTelegraphPreview;
 
     void Start()
     {
@@ -142,6 +157,435 @@ public class TilemapController : MonoBehaviour
                 }
             }
         }
+    }
+
+    public void BuildEnemyTelegraphPreview(EnemyMovement enemyMovement)
+    {
+        ClearEnemyTelegraphPreview();
+
+        if (gridTilemap == null || enemyTelegraphPreviewTilemap == null || enemyMovement == null)
+            return;
+
+        BuildEnemyTelegraphPreviewInternal(enemyMovement);
+        hasTelegraphPreview = enemyTelegraphPreviewTiles.Count > 0;
+    }
+
+    public void BuildAllEnemyTelegraphPreview(IList<EnemyMovement> enemyMovements)
+    {
+        ClearEnemyTelegraphPreview();
+
+        if (gridTilemap == null || enemyTelegraphPreviewTilemap == null || enemyMovements == null)
+            return;
+
+        for (int i = 0; i < enemyMovements.Count; i++)
+        {
+            if (enemyMovements[i] == null)
+                continue;
+
+            BuildEnemyTelegraphPreviewInternal(enemyMovements[i]);
+        }
+
+        hasTelegraphPreview = enemyTelegraphPreviewTiles.Count > 0;
+    }
+
+    public void ClearTelegraphPreview()
+    {
+        if (telegraphPreviewTilemap != null)
+        {
+            foreach (var cell in telegraphPreviewTiles.Keys)
+            {
+                telegraphPreviewTilemap.SetTile(cell, null);
+            }
+        }
+
+        telegraphPreviewTiles.Clear();
+        hasTelegraphPreview = false;
+    }
+
+    public void ClearEnemyTelegraphPreview()
+    {
+        if (enemyTelegraphPreviewTilemap != null)
+        {
+            foreach (var cell in enemyTelegraphPreviewTiles.Keys)
+            {
+                enemyTelegraphPreviewTilemap.SetTile(cell, null);
+                enemyTelegraphPreviewTilemap.SetColor(cell, Color.white);
+            }
+        }
+
+        enemyTelegraphPreviewTiles.Clear();
+    }
+
+    public void BuildTelegraphPreview(Vector3Int startGridPos, Vector2Int startFacing, IList<CardController> selectedCards)
+    {
+        ClearTelegraphPreview();
+
+        if (gridTilemap == null || telegraphPreviewTilemap == null || selectedCards == null || selectedCards.Count == 0)
+            return;
+
+        Vector3Int currentPos = startGridPos;
+        Vector2Int currentFacing = startFacing;
+
+        CardAction lastActionType = default;
+        int lastActionValue = 0;
+        bool lastActionFlipped = false;
+        bool hasLastAction = false;
+        bool lastActionWasRotate = false;
+
+        for (int i = 0; i < selectedCards.Count; i++)
+        {
+            CardController card = selectedCards[i];
+            if (card == null) continue;
+
+            SimulateCardPreview(
+                card.actionType,
+                card.actionValue,
+                card.IsFlipped,
+                ref currentPos,
+                ref currentFacing,
+                ref lastActionType,
+                ref lastActionValue,
+                ref lastActionFlipped,
+                ref hasLastAction,
+                ref lastActionWasRotate);
+        }
+
+        if (!lastActionWasRotate)
+        {
+            AddTelegraphPreviewTile(currentPos, GetPreviewEndTile());
+        }
+
+        hasTelegraphPreview = telegraphPreviewTiles.Count > 0;
+    }
+
+    private void SimulateCardPreview(
+        CardAction action,
+        int value,
+        bool flipped,
+        ref Vector3Int currentPos,
+        ref Vector2Int currentFacing,
+        ref CardAction lastActionType,
+        ref int lastActionValue,
+        ref bool lastActionFlipped,
+        ref bool hasLastAction,
+        ref bool lastActionWasRotate)
+    {
+        if (action == CardAction.Copy)
+        {
+            if (hasLastAction)
+            {
+                SimulateCardPreview(
+                    lastActionType,
+                    lastActionValue,
+                    lastActionFlipped,
+                    ref currentPos,
+                    ref currentFacing,
+                    ref lastActionType,
+                    ref lastActionValue,
+                    ref lastActionFlipped,
+                    ref hasLastAction,
+                    ref lastActionWasRotate);
+            }
+
+            return;
+        }
+
+        switch (action)
+        {
+            case CardAction.Move:
+            case CardAction.Dash:
+                SimulateLinearPreviewMove(ref currentPos, currentFacing, value, ref currentFacing, true);
+                lastActionWasRotate = false;
+                break;
+
+            case CardAction.Back:
+                SimulateLinearPreviewMove(ref currentPos, new Vector2Int(-currentFacing.x, -currentFacing.y), value, ref currentFacing, true);
+                lastActionWasRotate = false;
+                break;
+
+            case CardAction.Rotate:
+                currentFacing = RotateFacing(currentFacing, flipped ? -1 : 1);
+                AddTelegraphPreviewTile(currentPos, GetRotatePreviewTile(currentFacing));
+                lastActionWasRotate = true;
+                break;
+
+            case CardAction.Side:
+                SimulateLinearPreviewMove(ref currentPos, GetSideDirection(currentFacing, !flipped), value, ref currentFacing, true);
+                lastActionWasRotate = false;
+                break;
+        }
+
+        lastActionType = action;
+        lastActionValue = value;
+        lastActionFlipped = flipped;
+        hasLastAction = true;
+    }
+
+    private void SimulateLinearPreviewMove(ref Vector3Int currentPos, Vector2Int direction, int distance, ref Vector2Int facingForAttack, bool allowAttackPreview)
+    {
+        Vector3Int step = new Vector3Int(direction.x, direction.y, 0);
+
+        for (int i = 0; i < Mathf.Max(0, distance); i++)
+        {
+            Vector3Int targetPos = currentPos + step;
+            if (!CanMoveTo(targetPos))
+                break;
+
+            TileBase previewTile = GetPreviewTileForStep(targetPos, facingForAttack, allowAttackPreview);
+            AddTelegraphPreviewTile(targetPos, previewTile);
+
+            if (previewTile == AttackTile)
+            {
+                UpdatePreviewFacingAfterAttack(targetPos, direction, ref facingForAttack);
+            }
+
+            currentPos = targetPos;
+
+            if (IsTileType(targetPos, TileType.Stop))
+                break;
+
+            if (IsTileType(targetPos, TileType.Slip))
+            {
+                Vector3Int slipTargetPos = currentPos + step;
+                if (CanMoveTo(slipTargetPos))
+                {
+                    TileBase slipPreviewTile = GetPreviewTileForStep(slipTargetPos, facingForAttack, allowAttackPreview);
+                    AddTelegraphPreviewTile(slipTargetPos, slipPreviewTile);
+
+                    if (slipPreviewTile == AttackTile)
+                    {
+                        UpdatePreviewFacingAfterAttack(slipTargetPos, direction, ref facingForAttack);
+                    }
+
+                    currentPos = slipTargetPos;
+
+                    if (IsTileType(slipTargetPos, TileType.Stop))
+                        break;
+                }
+            }
+        }
+    }
+
+    private Vector2Int RotateFacing(Vector2Int facing, int rotDir)
+    {
+        if (rotDir == 1)
+        {
+            if (facing == Vector2Int.up) return Vector2Int.right;
+            if (facing == Vector2Int.right) return Vector2Int.down;
+            if (facing == Vector2Int.down) return Vector2Int.left;
+            return Vector2Int.up;
+        }
+
+        if (facing == Vector2Int.up) return Vector2Int.left;
+        if (facing == Vector2Int.left) return Vector2Int.down;
+        if (facing == Vector2Int.down) return Vector2Int.right;
+        return Vector2Int.up;
+    }
+
+    private Vector2Int GetSideDirection(Vector2Int facing, bool isRight)
+    {
+        if (isRight)
+            return new Vector2Int(facing.y, -facing.x);
+
+        return new Vector2Int(-facing.y, facing.x);
+    }
+
+    private void AddTelegraphPreviewTile(Vector3Int cell, TileBase tile)
+    {
+        if (telegraphPreviewTilemap == null || tile == null)
+            return;
+
+        if (telegraphPreviewTiles.TryGetValue(cell, out TileBase existingTile))
+        {
+            if (existingTile == AttackTile && tile != AttackTile)
+                return;
+
+            if (existingTile != AttackTile && tile == GetMovePreviewTile())
+                return;
+        }
+
+        telegraphPreviewTiles[cell] = tile;
+        telegraphPreviewTilemap.SetTile(cell, tile);
+    }
+
+    private void AddEnemyTelegraphPreviewTile(Vector3Int cell, TileBase tile)
+    {
+        if (enemyTelegraphPreviewTilemap == null || tile == null)
+            return;
+
+        if (enemyTelegraphPreviewTiles.TryGetValue(cell, out TileBase existingTile))
+        {
+            if (existingTile == AttackTile && tile != AttackTile)
+                return;
+
+            if (existingTile != AttackTile && tile == GetMovePreviewTile())
+                return;
+        }
+
+        enemyTelegraphPreviewTiles[cell] = tile;
+        enemyTelegraphPreviewTilemap.SetTile(cell, tile);
+        enemyTelegraphPreviewTilemap.SetColor(cell, enemyTelegraphColor);
+    }
+
+    private TileBase GetMovePreviewTile()
+    {
+        if (previewPathTile != null)
+            return previewPathTile;
+
+        return moveTile;
+    }
+
+    private TileBase GetPreviewTileForStep(Vector3Int targetPos, Vector2Int facingForAttack, bool allowAttackPreview)
+    {
+        if (!allowAttackPreview)
+            return GetMovePreviewTile();
+
+        if (CheckEnemyIsThere(targetPos))
+            return GetPreviewAttackTile();
+
+        if (HasEnemyInFacingNeighbor(targetPos, facingForAttack))
+            return GetPreviewAttackTile();
+
+        return GetMovePreviewTile();
+    }
+
+    private bool HasEnemyInFacingNeighbor(Vector3Int gridPos, Vector2Int facingForAttack)
+    {
+        if (enemy == null || gridTilemap == null)
+            return false;
+
+        Vector3Int neighborPos = gridPos + new Vector3Int(facingForAttack.x, facingForAttack.y, 0);
+        for (int i = 0; i < enemy.Length; i++)
+        {
+            if (enemy[i] == null)
+                continue;
+
+            Vector3Int enemyGridPos = gridTilemap.WorldToCell(enemy[i].position);
+            if (enemyGridPos == neighborPos)
+                return true;
+        }
+
+        return false;
+    }
+
+    private TileBase GetPreviewAttackTile()
+    {
+        if (AttackTile != null)
+            return AttackTile;
+
+        if (previewEndTile != null)
+            return previewEndTile;
+
+        Debug.LogWarning("TilemapController: AttackTile belum di-assign, telegraph attack akan terlihat seperti move tile.");
+        return GetMovePreviewTile();
+    }
+
+    private bool HasPlayerAt(Vector3Int gridPos)
+    {
+        if (player == null || gridTilemap == null)
+            return false;
+
+        Vector3Int playerGridPos = gridTilemap.WorldToCell(player.position);
+        return playerGridPos == gridPos;
+    }
+
+    private int GetEnemyMoveDistance(EnemyMovement enemyMovement)
+    {
+        if (enemyMovement == null)
+            return 0;
+
+        return enemyMovement.enemyType switch
+        {
+            EnemyType.Nebelss => 2,
+            EnemyType.Hook => 1,
+            _ => 0,
+        };
+    }
+
+    private void BuildEnemyTelegraphPreviewInternal(EnemyMovement enemyMovement)
+    {
+        if (enemyMovement == null || gridTilemap == null)
+            return;
+
+        Vector3Int currentPos = gridTilemap.WorldToCell(enemyMovement.transform.position);
+        Vector2Int moveDirection = enemyMovement.facingDirection;
+        int moveDistance = GetEnemyMoveDistance(enemyMovement);
+
+        for (int i = 0; i < moveDistance; i++)
+        {
+            Vector3Int targetPos = currentPos + new Vector3Int(moveDirection.x, moveDirection.y, 0);
+            if (!CanMoveTo(targetPos))
+                break;
+
+            if (HasPlayerAt(targetPos))
+            {
+                AddEnemyTelegraphPreviewTile(targetPos, GetPreviewAttackTile());
+                break;
+            }
+
+            AddEnemyTelegraphPreviewTile(targetPos, GetMovePreviewTile());
+
+            if (CheckMoveToPlayer(targetPos, enemyMovement))
+            {
+                Vector3Int attackPos = targetPos + new Vector3Int(moveDirection.x, moveDirection.y, 0);
+                AddEnemyTelegraphPreviewTile(attackPos, GetPreviewAttackTile());
+                break;
+            }
+
+            currentPos = targetPos;
+
+            if (IsTileType(targetPos, TileType.Stop))
+                break;
+
+            if (IsTileType(targetPos, TileType.Slip))
+            {
+                Vector3Int slipTargetPos = currentPos + new Vector3Int(moveDirection.x, moveDirection.y, 0);
+                if (CanMoveTo(slipTargetPos))
+                {
+                    AddEnemyTelegraphPreviewTile(slipTargetPos, GetMovePreviewTile());
+                    currentPos = slipTargetPos;
+
+                    if (CheckMoveToPlayer(slipTargetPos, enemyMovement))
+                    {
+                        Vector3Int attackPos = slipTargetPos + new Vector3Int(moveDirection.x, moveDirection.y, 0);
+                        AddEnemyTelegraphPreviewTile(attackPos, GetPreviewAttackTile());
+                        break;
+                    }
+
+                    if (IsTileType(slipTargetPos, TileType.Stop))
+                        break;
+                }
+            }
+        }
+    }
+
+    private void UpdatePreviewFacingAfterAttack(Vector3Int targetPos, Vector2Int stepDirection, ref Vector2Int facingForAttack)
+    {
+        if (CheckEnemyIsThere(targetPos))
+        {
+            facingForAttack = stepDirection;
+            return;
+        }
+
+        facingForAttack = stepDirection;
+    }
+
+    private TileBase GetRotatePreviewTile(Vector2Int facing)
+    {
+        if (facing == Vector2Int.up && RotateUpTile != null) return RotateUpTile;
+        if (facing == Vector2Int.down && RotateDownTile != null) return RotateDownTile;
+        if (facing == Vector2Int.left && RotateLeftTile != null) return RotateLeftTile;
+        if (facing == Vector2Int.right && RotateRightTile != null) return RotateRightTile;
+
+        return GetMovePreviewTile();
+    }
+
+    private TileBase GetPreviewEndTile()
+    {
+        if (previewEndTile != null)
+            return previewEndTile;
+
+        return GetMovePreviewTile();
     }
 
     public void CalculateLayerForCharacter(Transform character, SpriteRenderer spr) // check apakah player atau enemy ada di tile paling atas atau bawah jadi kalkulasi semua baris y agar bisa tentukan sorting order player atau enemy
@@ -477,6 +921,9 @@ public class TilemapController : MonoBehaviour
                 }
             }
         }
+
+        // Telegraph preview now renders on the telegraph Tilemap using TileBase tiles,
+        // so there is no separate Gizmos overlay for the preview.
     }
 
 
