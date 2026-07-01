@@ -122,6 +122,7 @@ public class PlayerMovement : MonoBehaviour
                 if (tilemapController.CheckEnemyIsThere(targetGridPos) && !isAttacking)
                 {
                     Debug.Log("Enemy detected! Stopping movement for attack.");
+                    yield return StartCoroutine(FaceTargetGridPosBeforeAttack(targetGridPos));
                     AnimationPlayer(3); // Set animasi attack
                     isAttacking = true;
                     if (tilemapController.AttackEnemyAt(targetGridPos, damage)) // Panggil fungsi attack di TilemapController
@@ -143,15 +144,16 @@ public class PlayerMovement : MonoBehaviour
                 {
                     Debug.Log("Enemy detected nearby! Stopping movement for attack.");
 
+                    Vector3Int attackTargetGridPos = targetGridPos + new Vector3Int(facingDirection.x, facingDirection.y, 0);
+                    yield return StartCoroutine(FaceTargetGridPosBeforeAttack(attackTargetGridPos));
                     isAttacking = true;
+                    AnimationPlayer(3);
                     if (tilemapController.AttackEnemyAtNeighbor(targetGridPos, damage)) // Panggil fungsi attack di TilemapController
                     {
-                        AnimationPlayer(3);
                         yield return new WaitForSeconds(0.9f); // Jeda durasi animasi attack
                     }
                     else
                     {
-                        AnimationPlayer(3);
                         yield return new WaitForSeconds(0.9f);
                         break; // Enemy tidak berhasil diserang, hentikan pergerakan player
                     }
@@ -205,6 +207,24 @@ public class PlayerMovement : MonoBehaviour
         }
         tilemapController.CalculateLayerForCharacter(transform, playerSpriteRenderer); // Update sorting order saat bergerak
         transform.position = targetPos;
+    }
+
+    private IEnumerator FaceTargetGridPosBeforeAttack(Vector3Int targetGridPos)
+    {
+        Vector3Int currentGridPos = tilemapController.gridTilemap.WorldToCell(transform.position);
+        Vector3Int delta = targetGridPos - currentGridPos;
+
+        if (Mathf.Abs(delta.x) > Mathf.Abs(delta.y))
+        {
+            facingDirection = delta.x > 0 ? Vector2Int.right : Vector2Int.left;
+        }
+        else if (delta != Vector3Int.zero)
+        {
+            facingDirection = delta.y > 0 ? Vector2Int.up : Vector2Int.down;
+        }
+
+        UpdateVisualRotation();
+        yield return new WaitForSeconds(0.35f);
     }
 
     public void DestroyCard(int amount)
