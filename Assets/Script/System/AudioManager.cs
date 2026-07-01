@@ -1,68 +1,52 @@
 using UnityEngine;
 using UnityEngine.Audio;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
-/// <summary>
-/// Singleton AudioManager that persists across all scenes.
-/// Saves and loads volume settings via PlayerPrefs so settings
-/// are remembered between play sessions.
-///
-/// HOW TO USE:
-///   1. Create an empty GameObject in your first/boot scene.
-///   2. Attach this script to it.
-///   3. (Optional) Assign an AudioMixer to the 'Mixer' field in the Inspector
-///      and make sure it has exposed parameters named "MasterVolume",
-///      "MusicVolume", and "SFXVolume" (in dB, range -80 to 0).
-///   4. If you skip the AudioMixer, volumes are applied directly to
-///      AudioSource components via AudioListener.volume (master only).
-/// </summary>
 public class AudioManager : MonoBehaviour
 {
-    // ── Singleton ──────────────────────────────────────────────────────────
     public static AudioManager Instance { get; private set; }
 
-    // ── Inspector ──────────────────────────────────────────────────────────
-    [Header("Audio Mixer (optional)")]
-    [Tooltip("Assign your project's AudioMixer asset here.")]
-    public AudioMixer Mixer;
+    [Header("Sliders")]
+    [SerializeField] private Slider soundSliderMaster;
+    [SerializeField] private Slider soundSliderSFX;
+    [SerializeField] private Slider soundSliderMusic;
 
-    [Header("Mixer Exposed Parameter Names")]
-    public string MasterParam = "MasterVolume";
-    public string MusicParam  = "MusicVolume";
-    public string SFXParam    = "SFXVolume";
+    [Header("Mixer")]
+    [SerializeField] private AudioMixer audioMixer;
 
-    // ── PlayerPrefs Keys ───────────────────────────────────────────────────
-    private const string KEY_MASTER = "Vol_Master";
-    private const string KEY_MUSIC  = "Vol_Music";
-    private const string KEY_SFX    = "Vol_SFX";
+    [Header("Exposed Parameter Names (harus sama persis kayak di Mixer)")]
+    [SerializeField] private string masterParam = "MasterVolume";
+    [SerializeField] private string sfxParam = "SFXVolume";
+    [SerializeField] private string musicParam = "MusicVolume";
 
-    // ── Cached values (0–1 linear) ─────────────────────────────────────────
-    private float _master;
-    private float _music;
-    private float _sfx;
+    [Header("Snapshots (Ducking)")]
+    [SerializeField] private AudioMixerSnapshot normalSnapshot;
+    [SerializeField] private AudioMixerSnapshot duckedSnapshot;
+    [SerializeField] private float duckTransitionTime = 0.3f;
 
-    // ── Properties ────────────────────────────────────────────────────────
-    public float MasterVolume
+    [System.Serializable]
+    public class SceneMusicEntry
     {
-        get => _master;
-        set { _master = Mathf.Clamp01(value); ApplyMaster(); PlayerPrefs.SetFloat(KEY_MASTER, _master); PlayerPrefs.Save(); }
+        public string sceneName;
+        public AudioClip musicClip;
     }
 
-    public float MusicVolume
-    {
-        get => _music;
-        set { _music = Mathf.Clamp01(value); ApplyMusic(); PlayerPrefs.SetFloat(KEY_MUSIC, _music); PlayerPrefs.Save(); }
-    }
+    [Header("Music Playback")]
+    [SerializeField] private AudioSource musicSource;
+    [SerializeField] private float fadeDuration = 1f;
+    [SerializeField] private SceneMusicEntry[] sceneMusicMap;
 
-    public float SFXVolume
-    {
-        get => _sfx;
-        set { _sfx = Mathf.Clamp01(value); ApplySFX(); PlayerPrefs.SetFloat(KEY_SFX, _sfx); PlayerPrefs.Save(); }
-    }
+    private const string PrefMaster = "SavedMasterVolume";
+    private const string PrefSFX = "SavedSFXVolume";
+    private const string PrefMusic = "SavedMusicVolume";
 
-    // ── Unity Lifecycle ────────────────────────────────────────────────────
+    private Coroutine fadeCoroutine;
+
+    // ---------------- Singleton & Lifecycle ----------------
+
     private void Awake()
     {
-        // Singleton pattern
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -70,50 +54,136 @@ public class AudioManager : MonoBehaviour
         }
 
         Instance = this;
-        DontDestroyOnLoad(gameObject); // survive scene transitions
-
-        LoadSettings();
+        DontDestroyOnLoad(gameObject);
     }
 
-    // ── Private Helpers ────────────────────────────────────────────────────
-
-    /// <summary>Load saved volumes from PlayerPrefs (defaults to 1.0 if not set).</summary>
-    private void LoadSettings()
+    private void OnEnable()
     {
-        _master = PlayerPrefs.GetFloat(KEY_MASTER, 1f);
-        _music  = PlayerPrefs.GetFloat(KEY_MUSIC,  1f);
-        _sfx    = PlayerPrefs.GetFloat(KEY_SFX,    1f);
-
-        ApplyMaster();
-        ApplyMusic();
-        ApplySFX();
+        SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
-    /// <summary>Apply master volume. Uses AudioListener if no Mixer is assigned.</summary>
-    private void ApplyMaster()
+    private void OnDisable()
     {
-        if (Mixer != null)
-            Mixer.SetFloat(MasterParam, LinearToDecibel(_master));
-        else
-            AudioListener.volume = _master;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
-    private void ApplyMusic()
+    private void Start()
     {
-        if (Mixer != null)
-            Mixer.SetFloat(MusicParam, LinearToDecibel(_music));
-        // Without mixer, music volume is handled by the master AudioListener
+        LoadSavedVolumes();
     }
 
-    private void ApplySFX()
+    // ---------------- Volume Sliders ----------------
+
+    private void LoadSavedVolumes()
     {
-        if (Mixer != null)
-            Mixer.SetFloat(SFXParam, LinearToDecibel(_sfx));
+        float savedMaster = PlayerPrefs.GetFloat(PrefMaster, 100f);
+        float savedSFX = PlayerPrefs.GetFloat(PrefSFX, 100f);
+        float savedMusic = PlayerPrefs.GetFloat(PrefMusic, 100f);
+
+        if (soundSliderMaster != null) soundSliderMaster.SetValueWithoutNotify(savedMaster);
+        if (soundSliderSFX != null) soundSliderSFX.SetValueWithoutNotify(savedSFX);
+        if (soundSliderMusic != null) soundSliderMusic.SetValueWithoutNotify(savedMusic);
+
+        ApplyVolume(masterParam, savedMaster);
+        ApplyVolume(sfxParam, savedSFX);
+        ApplyVolume(musicParam, savedMusic);
     }
 
-    /// <summary>Convert 0-1 linear to decibels for AudioMixer (-80 dB floor).</summary>
-    private static float LinearToDecibel(float linear)
+    public void SetMasterVolume(float value)
     {
-        return linear > 0.0001f ? Mathf.Log10(linear) * 20f : -80f;
+        PlayerPrefs.SetFloat(PrefMaster, value);
+        ApplyVolume(masterParam, value);
+    }
+
+    public void SetSFXVolume(float value)
+    {
+        PlayerPrefs.SetFloat(PrefSFX, value);
+        ApplyVolume(sfxParam, value);
+    }
+
+    public void SetMusicVolume(float value)
+    {
+        PlayerPrefs.SetFloat(PrefMusic, value);
+        ApplyVolume(musicParam, value);
+    }
+
+    private void ApplyVolume(string parameterName, float sliderValue)
+    {
+        if (sliderValue < 1f) sliderValue = 0.001f;
+
+        float dB = Mathf.Log10(sliderValue / 100f) * 20f;
+        audioMixer.SetFloat(parameterName, dB);
+    }
+
+    // ---------------- Ducking ----------------
+
+    public void DuckVolume()
+    {
+        duckedSnapshot.TransitionTo(duckTransitionTime);
+    }
+
+    public void RestoreVolume()
+    {
+        normalSnapshot.TransitionTo(duckTransitionTime);
+    }
+
+    // ---------------- Music Auto-Detect per Scene ----------------
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        AudioClip clipForScene = GetClipForScene(scene.name);
+
+        if (clipForScene != null)
+        {
+            PlayMusic(clipForScene);
+        }
+    }
+
+    private AudioClip GetClipForScene(string sceneName)
+    {
+        foreach (var entry in sceneMusicMap)
+        {
+            if (entry.sceneName == sceneName)
+                return entry.musicClip;
+        }
+        return null;
+    }
+
+    public void PlayMusic(AudioClip newClip)
+    {
+        if (musicSource.clip == newClip && musicSource.isPlaying) return;
+
+        if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
+        fadeCoroutine = StartCoroutine(FadeToNewTrack(newClip));
+    }
+
+    private System.Collections.IEnumerator FadeToNewTrack(AudioClip newClip)
+    {
+        float startVolume = musicSource.volume;
+
+        if (musicSource.isPlaying)
+        {
+            float t = 0f;
+            while (t < fadeDuration)
+            {
+                t += Time.deltaTime;
+                musicSource.volume = Mathf.Lerp(startVolume, 0f, t / fadeDuration);
+                yield return null;
+            }
+        }
+
+        musicSource.clip = newClip;
+        musicSource.volume = 0f;
+        musicSource.Play();
+
+        float t2 = 0f;
+        while (t2 < fadeDuration)
+        {
+            t2 += Time.deltaTime;
+            musicSource.volume = Mathf.Lerp(0f, startVolume, t2 / fadeDuration);
+            yield return null;
+        }
+
+        musicSource.volume = startVolume;
     }
 }

@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using DG.Tweening;
+using UnityEngine.SceneManagement;
 
 public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
 {
@@ -18,6 +19,9 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     [SerializeField] private float hoverScale = 1.15f;      // Scale multiplier when hovered
     [SerializeField] private float duration = 0.15f;        // Transition duration in seconds
     [SerializeField] private Ease easeType = Ease.OutQuad;  // DOTween easing function
+
+    [SerializeField] private AudioClip hoverSFX;
+    [SerializeField] private AudioClip clickSFX;
 
     private Vector3 originalScale;
     private Material instancedMaterial;
@@ -65,6 +69,7 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     {
         isHovered = true;
         AnimateHover(true);
+        SFXPlayer.Instance.PlaySFX(hoverSFX);
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -75,7 +80,8 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        // Click action placeholder
+        SFXPlayer.Instance.PlaySFX(clickSFX);
+        // Example action: Load the "SampleScene" scene when clicked
     }
 
     private void AnimateHover(bool showHover)
