@@ -8,15 +8,17 @@ public class AudioManager : MonoBehaviour
     public static AudioManager Instance { get; private set; }
 
     [Header("Sliders")]
-    [SerializeField] private Slider soundSliderMaster;
     [SerializeField] private Slider soundSliderSFX;
     [SerializeField] private Slider soundSliderMusic;
+
+    [Header("Slider Tags (harus sama persis kayak di Tag Manager)")]
+    [SerializeField] private string sfxSliderTag = "SFXSlider";
+    [SerializeField] private string musicSliderTag = "MusicSlider";
 
     [Header("Mixer")]
     [SerializeField] private AudioMixer audioMixer;
 
     [Header("Exposed Parameter Names (harus sama persis kayak di Mixer)")]
-    [SerializeField] private string masterParam = "MasterVolume";
     [SerializeField] private string sfxParam = "SFXVolume";
     [SerializeField] private string musicParam = "MusicVolume";
 
@@ -37,7 +39,6 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private float fadeDuration = 1f;
     [SerializeField] private SceneMusicEntry[] sceneMusicMap;
 
-    private const string PrefMaster = "SavedMasterVolume";
     private const string PrefSFX = "SavedSFXVolume";
     private const string PrefMusic = "SavedMusicVolume";
 
@@ -69,30 +70,41 @@ public class AudioManager : MonoBehaviour
 
     private void Start()
     {
+        RelinkSliders();
         LoadSavedVolumes();
+    }
+
+    // ---------------- Slider Re-linking per Scene ----------------
+
+    private void RelinkSliders()
+    {
+        // soundSliderMaster = FindSliderByTag(masterSliderTag);
+        soundSliderSFX = FindSliderByTag(sfxSliderTag);
+        soundSliderMusic = FindSliderByTag(musicSliderTag);
+    }
+
+    private Slider FindSliderByTag(string tag)
+    {
+        if (string.IsNullOrEmpty(tag)) return null;
+
+        GameObject found = GameObject.FindWithTag(tag);
+        if (found == null) return null;
+
+        return found.GetComponent<Slider>();
     }
 
     // ---------------- Volume Sliders ----------------
 
     private void LoadSavedVolumes()
     {
-        float savedMaster = PlayerPrefs.GetFloat(PrefMaster, 100f);
         float savedSFX = PlayerPrefs.GetFloat(PrefSFX, 100f);
         float savedMusic = PlayerPrefs.GetFloat(PrefMusic, 100f);
 
-        if (soundSliderMaster != null) soundSliderMaster.SetValueWithoutNotify(savedMaster);
         if (soundSliderSFX != null) soundSliderSFX.SetValueWithoutNotify(savedSFX);
         if (soundSliderMusic != null) soundSliderMusic.SetValueWithoutNotify(savedMusic);
 
-        ApplyVolume(masterParam, savedMaster);
         ApplyVolume(sfxParam, savedSFX);
         ApplyVolume(musicParam, savedMusic);
-    }
-
-    public void SetMasterVolume(float value)
-    {
-        PlayerPrefs.SetFloat(PrefMaster, value);
-        ApplyVolume(masterParam, value);
     }
 
     public void SetSFXVolume(float value)
@@ -131,6 +143,9 @@ public class AudioManager : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        RelinkSliders();
+        LoadSavedVolumes();
+
         AudioClip clipForScene = GetClipForScene(scene.name);
 
         if (clipForScene != null)

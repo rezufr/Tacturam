@@ -91,6 +91,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   actionType: 1
   actionValue: 2
+  cardDescription: Dash forward 2 tiles.
   hoverHeight: 20
   selectHeight: 40
   hoverScale: 1.05

@@ -91,6 +91,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   actionType: 5
   actionValue: 1
+  cardDescription: Copy the effect of the previously played card.
   hoverHeight: 20
   selectHeight: 40
   hoverScale: 1.05

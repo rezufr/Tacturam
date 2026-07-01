@@ -41,6 +41,9 @@ public class GameManager : MonoBehaviour
     public static List<string> permanentDeckNames = new List<string>();
     public static List<string> takenCardNames = new List<string>();
 
+    // Stage tracker, persist selama aplikasi jalan (dipakai CardRewardManager)
+    public static int currentGameStage = 1;
+
     // Untuk fitur Copy
     private CardAction lastActionType;
     private int lastActionValue;
@@ -58,7 +61,7 @@ public class GameManager : MonoBehaviour
         // Testing trigger for UI/reward integration
         if (Input.GetKeyDown(KeyCode.R))
         {
-            Debug.Log("[GameManager] Cheat key 'R' pressed. Loading RewardUI scene...");
+            Debug.Log($"[GameManager] Cheat key 'R' pressed. Loading RewardUI scene for stage {currentGameStage}...");
             UnityEngine.SceneManagement.SceneManager.LoadScene("RewardUI");
         }
     }
@@ -75,7 +78,9 @@ public class GameManager : MonoBehaviour
 
     private void InitializeDeck()
     {
-        // deckList.Clear();
+        // PENTING: kosongkan dulu deckList (yang mungkin berisi data default dari Inspector),
+        // supaya tidak menumpuk/dobel setiap kali scene di-reload.
+        deckList.Clear();
 
         if (permanentDeckNames != null && permanentDeckNames.Count > 0)
         {
@@ -92,13 +97,23 @@ public class GameManager : MonoBehaviour
         else
         {
             Debug.Log("[GameManager] Permanent deck registry is empty. Initializing a default deck.");
+            // Karena deckList sudah di-Clear() di atas, kita butuh sumber default lain.
+            // Gunakan cardPrefabs sebagai starting deck jika permanentDeckNames masih kosong
+            // (misal ini adalah run pertama kali game dijalankan).
             permanentDeckNames = new List<string>();
-            for (int i = 0; i < deckList.Count; i++)
+
+            if (cardPrefabs != null && cardPrefabs.Length > 0)
             {
-                GameObject prefab = deckList[i];
-                permanentDeckNames.Add(prefab.name);
+                int countToAdd = Mathf.Min(startingDeckSize, cardPrefabs.Length);
+                for (int i = 0; i < countToAdd; i++)
+                {
+                    GameObject prefab = cardPrefabs[i % cardPrefabs.Length];
+                    deckList.Add(prefab);
+                    permanentDeckNames.Add(prefab.name);
+                }
             }
         }
+
         ShuffleDeck();
     }
 

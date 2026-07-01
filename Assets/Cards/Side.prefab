@@ -223,6 +223,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   actionType: 4
   actionValue: 1
+  cardDescription: Step sideways to the tile beside your character.
   hoverHeight: 20
   selectHeight: 40
   hoverScale: 1.05
