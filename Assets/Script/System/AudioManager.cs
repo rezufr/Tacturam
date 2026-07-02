@@ -32,6 +32,10 @@ public class AudioManager : MonoBehaviour
     {
         public string sceneName;
         public AudioClip musicClip;
+        public AudioClip[] musicClips;
+        public bool shufflePlaylist = false;
+        public bool loopPlaylist = true;
+        public bool loopSingleClip = true;
     }
 
     [Header("Music Playback")]
@@ -43,6 +47,11 @@ public class AudioManager : MonoBehaviour
     private const string PrefMusic = "SavedMusicVolume";
 
     private Coroutine fadeCoroutine;
+    private AudioClip[] activeMusicClips;
+    private int activeMusicIndex = -1;
+    private bool activeMusicLoopPlaylist = true;
+    private bool activeMusicLoopSingle = true;
+    private bool isMusicTransitioning = false;
 
     // ---------------- Singleton & Lifecycle ----------------
 
@@ -72,6 +81,11 @@ public class AudioManager : MonoBehaviour
     {
         RelinkSliders();
         LoadSavedVolumes();
+    }
+
+    private void Update()
+    {
+        UpdatePlaylistPlayback();
     }
 
     // ---------------- Slider Re-linking per Scene ----------------
@@ -146,34 +160,70 @@ public class AudioManager : MonoBehaviour
         RelinkSliders();
         LoadSavedVolumes();
 
-        AudioClip clipForScene = GetClipForScene(scene.name);
-
-        if (clipForScene != null)
-        {
-            PlayMusic(clipForScene);
-        }
+        PlaySceneMusic(GetEntryForScene(scene.name));
     }
 
-    private AudioClip GetClipForScene(string sceneName)
+    private SceneMusicEntry GetEntryForScene(string sceneName)
     {
         foreach (var entry in sceneMusicMap)
         {
             if (entry.sceneName == sceneName)
-                return entry.musicClip;
+                return entry;
         }
+        return null;
+    }
+
+    private AudioClip[] GetClipsForEntry(SceneMusicEntry entry)
+    {
+        if (entry == null)
+            return null;
+
+        if (entry.musicClips != null && entry.musicClips.Length > 0)
+        {
+            int validCount = 0;
+            for (int i = 0; i < entry.musicClips.Length; i++)
+            {
+                if (entry.musicClips[i] != null)
+                    validCount++;
+            }
+
+            if (validCount == 0)
+                return null;
+
+            AudioClip[] clips = new AudioClip[validCount];
+            int index = 0;
+            for (int i = 0; i < entry.musicClips.Length; i++)
+            {
+                if (entry.musicClips[i] != null)
+                    clips[index++] = entry.musicClips[i];
+            }
+
+            return clips;
+        }
+
+        if (entry.musicClip != null)
+            return new[] { entry.musicClip };
+
         return null;
     }
 
     public void PlayMusic(AudioClip newClip)
     {
-        if (musicSource.clip == newClip && musicSource.isPlaying) return;
-
-        if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
-        fadeCoroutine = StartCoroutine(FadeToNewTrack(newClip));
+        PlayMusic(newClip, false);
     }
 
-    private System.Collections.IEnumerator FadeToNewTrack(AudioClip newClip)
+    public void PlayMusic(AudioClip newClip, bool loopCurrentClip)
     {
+        if (musicSource == null || newClip == null) return;
+        if (musicSource.clip == newClip && musicSource.isPlaying && musicSource.loop == loopCurrentClip) return;
+
+        if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
+        fadeCoroutine = StartCoroutine(FadeToNewTrack(newClip, loopCurrentClip));
+    }
+
+    private System.Collections.IEnumerator FadeToNewTrack(AudioClip newClip, bool loopCurrentClip)
+    {
+        isMusicTransitioning = true;
         float startVolume = musicSource.volume;
 
         if (musicSource.isPlaying)
@@ -188,6 +238,7 @@ public class AudioManager : MonoBehaviour
         }
 
         musicSource.clip = newClip;
+        musicSource.loop = loopCurrentClip;
         musicSource.volume = 0f;
         musicSource.Play();
 
@@ -200,5 +251,68 @@ public class AudioManager : MonoBehaviour
         }
 
         musicSource.volume = startVolume;
+        isMusicTransitioning = false;
+    }
+
+    private void PlaySceneMusic(SceneMusicEntry entry)
+    {
+        activeMusicClips = GetClipsForEntry(entry);
+        activeMusicIndex = -1;
+        activeMusicLoopPlaylist = entry != null && entry.loopPlaylist;
+        activeMusicLoopSingle = entry != null && entry.loopSingleClip;
+
+        if (activeMusicClips == null || activeMusicClips.Length == 0)
+            return;
+
+        if (entry != null && entry.shufflePlaylist && activeMusicClips.Length > 1)
+            ShuffleAudioClips(activeMusicClips);
+
+        activeMusicIndex = 0;
+        PlayMusic(activeMusicClips[activeMusicIndex], activeMusicClips.Length == 1 && activeMusicLoopSingle);
+    }
+
+    private void UpdatePlaylistPlayback()
+    {
+        if (isMusicTransitioning || musicSource == null || activeMusicClips == null || activeMusicClips.Length <= 1)
+            return;
+
+        if (musicSource.isPlaying)
+            return;
+
+        PlayNextPlaylistTrack();
+    }
+
+    private void PlayNextPlaylistTrack()
+    {
+        if (activeMusicClips == null || activeMusicClips.Length == 0)
+            return;
+
+        activeMusicIndex++;
+
+        if (activeMusicIndex >= activeMusicClips.Length)
+        {
+            if (!activeMusicLoopPlaylist)
+                return;
+
+            activeMusicIndex = 0;
+
+            if (activeMusicClips.Length > 1)
+                ShuffleAudioClips(activeMusicClips);
+        }
+
+        AudioClip nextClip = activeMusicClips[activeMusicIndex];
+        if (nextClip != null)
+            PlayMusic(nextClip, false);
+    }
+
+    private void ShuffleAudioClips(AudioClip[] clips)
+    {
+        for (int i = 0; i < clips.Length; i++)
+        {
+            int randomIndex = Random.Range(i, clips.Length);
+            AudioClip temp = clips[i];
+            clips[i] = clips[randomIndex];
+            clips[randomIndex] = temp;
+        }
     }
 }

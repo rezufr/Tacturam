@@ -25,6 +25,8 @@ public class PlayerMovement : MonoBehaviour
     [Header("Animation")]
     public Animator playerAnimator;
     public SpriteRenderer playerSpriteRenderer;
+    [SerializeField] private AudioClip moveSFX;
+    [SerializeField] private AudioClip killSFX;
 
     /// <summary>
     /// Berputar 90 derajat. 
@@ -137,6 +139,7 @@ public class PlayerMovement : MonoBehaviour
                     isAttacking = true;
                     if (tilemapController.AttackEnemyAt(targetGridPos, damage)) // Panggil fungsi attack di TilemapController
                     {
+                        PlayKillSFX();
                         yield return new WaitForSeconds(0.9f); // Jeda durasi animasi attack
                     }
                     else
@@ -148,6 +151,7 @@ public class PlayerMovement : MonoBehaviour
                 // Gerak Mulus ke Target
                 Vector3 targetWorldPos = tilemapController.gridTilemap.GetCellCenterWorld(targetGridPos);
                 yield return StartCoroutine(MoveToPosition(targetWorldPos));
+                PlayMoveSFX();
 
                 // cek tile neighbor apakah ada enemy, jika ada maka hentikan pergerakan player untuk attack lalu lanjutkan move ke target tile
                 if (tilemapController.CheckMoveToEnemy(targetGridPos) && !isAttacking)
@@ -160,6 +164,7 @@ public class PlayerMovement : MonoBehaviour
                     AnimationPlayer(3);
                     if (tilemapController.AttackEnemyAtNeighbor(targetGridPos, damage)) // Panggil fungsi attack di TilemapController
                     {
+                        PlayKillSFX();
                         yield return new WaitForSeconds(0.9f); // Jeda durasi animasi attack
                     }
                     else
@@ -192,6 +197,7 @@ public class PlayerMovement : MonoBehaviour
                     {
                         Vector3 slipTargetWorldPos = tilemapController.gridTilemap.GetCellCenterWorld(slipTargetGridPos);
                         yield return StartCoroutine(MoveToPosition(slipTargetWorldPos));
+                        PlayMoveSFX();
                     }
                 }
 
@@ -242,6 +248,22 @@ public class PlayerMovement : MonoBehaviour
 
         UpdateVisualRotation();
         yield return new WaitForSeconds(0.35f);
+    }
+
+    private void PlayMoveSFX()
+    {
+        if (moveSFX == null) return;
+        if (SFXPlayer.Instance == null) return;
+
+        SFXPlayer.Instance.PlaySFX(moveSFX);
+    }
+
+    private void PlayKillSFX()
+    {
+        if (killSFX == null) return;
+        if (SFXPlayer.Instance == null) return;
+
+        SFXPlayer.Instance.PlaySFX(killSFX);
     }
 
     public void DestroyCard(int amount)

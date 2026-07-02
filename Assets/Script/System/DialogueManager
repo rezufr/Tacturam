@@ -1,0 +1,49 @@
+using UnityEngine;
+using TMPro;
+using System.Collections;
+
+public class DialogueManager : MonoBehaviour
+{
+    public static DialogueManager Instance;
+    [SerializeField] private GameObject dialogueBox;
+    [SerializeField] private TextMeshProUGUI dialogueText;
+    [SerializeField] private RectTransform dialogueRect;
+
+    [SerializeField] private Vector2 topPos = new Vector2(0, 300);
+    [SerializeField] private Vector2 centerPos = new Vector2(0, 0);
+    [SerializeField] private Vector2 bottomPos = new Vector2(0, -300);
+
+    private Coroutine currentRoutine;
+
+    void Awake()
+    {
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
+        dialogueBox.SetActive(false);
+    }
+
+    public void ShowDialogue(DialogueData data)
+    {
+        if (currentRoutine != null) StopCoroutine(currentRoutine);
+        currentRoutine = StartCoroutine(ShowRoutine(data));
+    }
+
+    private IEnumerator ShowRoutine(DialogueData data)
+    {
+        dialogueRect.anchoredPosition = data.position switch
+        {
+            DialoguePosition.Top => topPos,
+            DialoguePosition.Center => centerPos,
+            DialoguePosition.Bottom => bottomPos,
+            DialoguePosition.Custom => data.customPosition,
+            _ => topPos
+        };
+
+        dialogueText.text = data.message;
+        dialogueBox.SetActive(true);
+
+        yield return new WaitForSeconds(data.duration);
+
+        dialogueBox.SetActive(false);
+    }
+}

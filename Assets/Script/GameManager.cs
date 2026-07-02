@@ -38,6 +38,7 @@ public class GameManager : MonoBehaviour
 
     [SerializeField] private List<GameObject> deckList = new List<GameObject>();
     [SerializeField] private List<GameObject> takenCards = new List<GameObject>();
+    [SerializeField] private AudioClip drawCardSFX;
     private bool isPlayingSequence = false;
     private int lastTelegraphPreviewHash = int.MinValue;
 
@@ -356,6 +357,7 @@ public class GameManager : MonoBehaviour
             {
                 DrawOneCard();
                 yield return new WaitForSeconds(drawStaggerDelay);
+                SFXPlayer.Instance.PlaySFX(drawCardSFX);
             }
             else break;
         }

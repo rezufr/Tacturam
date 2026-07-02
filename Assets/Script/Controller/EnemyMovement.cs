@@ -56,6 +56,7 @@ public class EnemyMovement : MonoBehaviour
     [Header("Animation")]
     public Animator enemyAnimator;
     public SpriteRenderer enemySpriteRenderer;
+    [SerializeField] private AudioClip moveSFX;
 
     void Start()
     {
@@ -318,6 +319,7 @@ public class EnemyMovement : MonoBehaviour
                 // Gerak Mulus ke Target
                 Vector3 targetWorldPos = tilemapController.gridTilemap.GetCellCenterWorld(targetGridPos);
                 yield return StartCoroutine(MoveToPosition(targetWorldPos));
+                PlayMoveSFX();
 
                 // cek tile neighbor apakah ada player, jika ada maka hentikan pergerakan player untuk attack lalu lanjutkan move ke target tile
                 if (tilemapController.CheckMoveToPlayer(targetGridPos, this) && !isAttacking)
@@ -360,6 +362,7 @@ public class EnemyMovement : MonoBehaviour
                     {
                         Vector3 slipTargetWorldPos = tilemapController.gridTilemap.GetCellCenterWorld(slipTargetGridPos);
                         yield return StartCoroutine(MoveToPosition(slipTargetWorldPos));
+                        PlayMoveSFX();
                     }
                 }
 
@@ -411,6 +414,14 @@ public class EnemyMovement : MonoBehaviour
         }
         tilemapController.CalculateLayerForCharacter(transform, enemySpriteRenderer); // Update sorting order saat bergerak
         transform.position = targetPos;
+    }
+
+    private void PlayMoveSFX()
+    {
+        if (moveSFX == null) return;
+        if (SFXPlayer.Instance == null) return;
+
+        SFXPlayer.Instance.PlaySFX(moveSFX);
     }
 
     public void AnimationPlayer(int actionValue)

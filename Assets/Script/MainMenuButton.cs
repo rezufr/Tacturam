@@ -39,10 +39,6 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         originalScale = transform.localScale;
 
         // Find the custom shader if not explicitly assigned in Inspector
-        if (colorOverrideShader == null)
-        {
-            colorOverrideShader = Shader.Find("UI/ColorOverride");
-        }
 
         // Create an instanced material so it doesn't affect other UI elements sharing the same material
         if (buttonImage != null && colorOverrideShader != null)
@@ -50,7 +46,7 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
             instancedMaterial = new Material(colorOverrideShader);
             instancedMaterial.SetColor("_HoverColor", hoverColor);
             instancedMaterial.SetFloat("_HoverProgress", 0f);
-            
+
             buttonImage.material = instancedMaterial;
         }
         else
@@ -69,7 +65,10 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     {
         isHovered = true;
         AnimateHover(true);
-        SFXPlayer.Instance.PlaySFX(hoverSFX);
+        if (SFXPlayer.Instance != null)
+        {
+            SFXPlayer.Instance.PlaySFX(hoverSFX);
+        }
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -80,7 +79,10 @@ public class MainMenuButton : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        SFXPlayer.Instance.PlaySFX(clickSFX);
+        if (SFXPlayer.Instance != null)
+        {
+            SFXPlayer.Instance.PlaySFX(clickSFX);
+        }
         // Example action: Load the "SampleScene" scene when clicked
     }
 
