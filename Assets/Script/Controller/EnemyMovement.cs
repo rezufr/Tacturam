@@ -23,6 +23,15 @@ public class EnemyMovement : MonoBehaviour
     [Header("References")]
     public TilemapController tilemapController;
     public GameManager gameManager;
+    public Transform pointLeft;
+    public Transform pointRight;
+    public Transform pointUp;
+    public Transform pointDown;
+
+    public GameObject attackLeft;
+    public GameObject attackRight;
+    public GameObject attackUp;
+    public GameObject attackDown;
 
     [Header("Settings")]
     public float moveSpeed = 7f;    // Kecepatan gerak (Velocity)
@@ -189,15 +198,69 @@ public class EnemyMovement : MonoBehaviour
                 Move(facingDirection, 1); // Groom bergerak 1 langkah
             }
         }
-        else if (state == EnemyState.Idle)
+        else if (state == EnemyState.Attacking)
         {
-            AnimationPlayer(1); // Set animasi idle
+            Attack();
         }
         else if (state == EnemyState.Rotating)
         {
             SetFacingDirectionToPlayer(Vector2Int.RoundToInt(gameManager.player.transform.position)); // Menghadap ke player
         }
     }
+
+    public void Attack() // fungsi attack groom yaitu spawn panah di arah hadapnya 
+    {
+        if (isAttacking) return; // Jika sudah menyerang, hentikan
+        isAttacking = true;
+        StartCoroutine(AttackRoutine());
+    }
+
+    IEnumerator AttackRoutine()
+    {
+        AnimationPlayer(3); // Set animasi attack
+        GameObject attackPrefab = null;
+        Transform transformPrefab = null;
+
+        if (facingDirection == Vector2Int.up)
+        {
+            attackPrefab = attackUp;
+            transformPrefab = pointUp;
+        }
+        else if (facingDirection == Vector2Int.down)
+        {
+            attackPrefab = attackDown;
+            transformPrefab = pointDown;
+        }
+        else if (facingDirection == Vector2Int.left)
+        {
+            attackPrefab = attackLeft;
+            transformPrefab = pointLeft;
+        }
+        else if (facingDirection == Vector2Int.right)
+        {
+            attackPrefab = attackRight;
+            transformPrefab = pointRight;
+        }
+
+        if (attackPrefab != null)
+        {
+            GameObject attackInstance = Instantiate(
+                attackPrefab,
+                transformPrefab.position,
+                Quaternion.identity
+            );
+
+            attackInstance.transform.SetParent(transform); // Set parent agar mengikuti musuh
+
+            AttackProjectile projectile = attackInstance.GetComponent<AttackProjectile>();
+            projectile.Initialize(facingDirection);
+            print($"Enemy attacked in direction: {facingDirection}");
+        }
+        yield return new WaitForSeconds(0.9f); // Jeda sebelum menyerang
+        RotateEnemy(1); // Rotate ke kanan (Clockwise)
+        isAttacking = false;
+    }
+
 
     /// <summary>
     /// Memulai proses pergerakan bertahap (sequential).

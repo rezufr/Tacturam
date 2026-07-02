@@ -36,6 +36,16 @@ public class PlayerMovement : MonoBehaviour
         tilemapController.CalculateLayerForCharacter(transform, playerSpriteRenderer); // Update sorting order saat start
     }
 
+    public void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.CompareTag("Projectile"))
+        {
+            Debug.Log("Player collided with Projectile!");
+            // Tambahkan logika lain jika perlu, misal mengurangi HP player
+            DestroyCard(1); // Contoh: discard 1 kartu saat terkena projectile
+        }
+    }
+
     public void RotatePlayer(int rotDir)
     {
         if (isMoving) return;

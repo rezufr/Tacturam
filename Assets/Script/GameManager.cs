@@ -142,6 +142,11 @@ public class GameManager : MonoBehaviour
         enemy[index].SetMove(EnemyState.Moving);
     }
 
+    public void SetEnemyAttacking(int index)
+    {
+        enemy[index].SetMove(EnemyState.Attacking);
+    }
+
     public void SetEnemyRotate(int index)
     {
         print("[GameManager] Enemy rotate action triggered.");
@@ -166,7 +171,14 @@ public class GameManager : MonoBehaviour
             if (enemy[i] == null)
                 continue;
 
-            SetEnemyMove(i);
+            if (enemy[i].enemyType == EnemyType.Groom)
+            {
+                SetEnemyAttacking(i);
+            }
+            else
+            {
+                SetEnemyMove(i);
+            }
 
             yield return new WaitUntil(() => !enemy[i].IsMoving);
         }

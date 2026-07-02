@@ -6,6 +6,7 @@ TagManager:
   tags:
   - SFXSlider
   - MusicSlider
+  - Projectile
   layers:
   - Default
   - TransparentFX
